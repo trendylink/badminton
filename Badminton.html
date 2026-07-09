@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>羽毛球雲端月結神器</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        body { background-color: #f5f7fb; color: #333; padding: 12px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 450px; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; display: none; }
+        .loading { padding: 40px; text-align: center; font-size: 16px; color: #666; font-weight: bold; }
+        
+        /* Header */
+        .header { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; padding: 24px 16px; text-align: center; }
+        .header h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+        .header p { font-size: 13px; opacity: 0.9; }
+        
+        /* 篩選切換 */
+        .selector-box { padding: 12px 16px; border-bottom: 1px solid #eee; background: #fafafa; display: flex; gap: 10px; }
+        .select-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .select-group label { font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; }
+        select { padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; outline: none; background: white; width: 100%; }
+
+        .main-content { padding: 16px; }
+        
+        /* 總數卡片 */
+        .summary-card { background: #fff5f5; border: 1px solid #ffe3e3; border-left: 6px solid #ff4d4d; padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .total-label { font-size: 14px; color: #666; font-weight: 500; }
+        .total-amount { font-size: 32px; font-weight: bold; color: #ff4d4d; }
+        .status-badge { background: #ff4d4d; color: white; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; display: inline-block; margin-top: 4px; }
+
+        /* 列表標題 */
+        .section-title { font-size: 15px; color: #666; font-weight: bold; margin-bottom: 12px; display: flex; justify-content: space-between; }
+        
+        /* 每場活動明細 */
+        .card-list { display: flex; flex-direction: column; gap: 12px; }
+        .session-card { background: #fff; border: 1px solid #eaeaea; border-radius: 12px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.01); }
+        .card-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; color: #11998e; margin-bottom: 8px; border-bottom: 1px solid #f5f5f5; padding-bottom: 6px; }
+        .card-body { font-size: 13px; color: #555; line-height: 1.6; }
+        .row-detail { display: flex; justify-content: space-between; margin-top: 2px; }
+        .row-detail.sub { color: #888; font-size: 12px; padding-left: 10px; }
+        .row-total { display: flex; justify-content: space-between; font-weight: bold; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #ddd; color: #333; }
+
+        /* 付款按鈕 */
+        .pay-box { background: #eef9ff; border: 1px solid #cfe9ff; border-radius: 12px; padding: 14px; margin-top: 20px; text-align: center; font-size: 13px; }
+        .pay-btn { background: #11998e; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 8px; font-size: 14px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div id="loading" class="loading">📡 正在實時連線 Google Sheet 讀取最新數據...</div>
+
+<div class="app-container" id="app">
+    <div class="header">
+        <h1>🏸 羽毛球費用查閱系統</h1>
+        <p id="headerSub">雲端自動同步版</p>
+    </div>
+
+    <div class="selector-box">
+        <div class="select-group">
+            <label>📅 選擇月份</label>
+            <select id="monthSelect" onchange="renderBill()"></select>
+        </div>
+        <div class="select-group">
+            <label>👤 選擇隊員</label>
+            <select id="memberSelect" onchange="renderBill()"></select>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="summary-card">
+            <div>
+                <span class="total-label">本月應付總額</span><br>
+                <span class="status-badge">🔴 未付款</span>
+            </div>
+            <div class="total-amount" id="totalAmount">$0.00</div>
+        </div>
+
+        <div class="section-title">
+            <span>📅 出席及分攤明細</span>
+            <span id="attendanceCount" style="color:#11998e; font-weight:normal; font-size:13px;"></span>
+        </div>
+
+        <div class="card-list" id="sessionList"></div>
+
+        <div class="pay-box">
+            📲 支援 <strong>FPS / PayMe</strong> 轉賬至 Lynn<br>
+            <button class="pay-btn" onclick="alert('已複製轉賬號碼！方便你開啟銀行 App 付款。')">一鍵複製轉賬資料</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 你的 Google Sheet 身份證 ID
+const SHEET_ID = '1ShZbbdNjugrcz-_Ie4Vk6h7niCpwlZqaamR865HwKH0';
+
+// 全局數據庫變量
+let globalData = {
+    sessions: [],
+    monthlyShuttle: {},
+    members: {}
+};
+
+// 輔助函式：將 Google Sheet 導出的 CSV 轉成 Array
+function csvToArray(text) {
+    let p = '', r = [];
+    let q = false;
+    let row = [''];
+    for (let i=0; i<text.length; i++) {
+        let c = text[i];
+        if (c === '"') { q = !q; continue; }
+        if (!q && c === ',') { row.push(''); continue; }
+        if (!q && (c === '\r' || c === '\n')) {
+            if (c === '\n' && p === '\r') { p = c; continue; }
+            r.push(row); row = ['']; p = c; continue;
+        }
+        row[row.length-1] += c;
+        p = c;
+    }
+    if (row.length > 1 || row[0] !== '') r.push(row);
+    return r;
+}
+
+// 同步獲取 Google Sheet 數據
+async function initApp() {
+    try {
+        // 1. 讀取 Settings 工作表 (gid=1748286950)
+        const settingsUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=1748286950`;
+        const resSettings = await fetch(settingsUrl);
+        const textSettings = await resSettings.text();
+        const arrSettings = csvToArray(textSettings);
+        
+        // 解析 Settings
+        arrSettings.forEach((row, index) => {
+            if (index === 0) return; // 跳過 Header
+            // 讀取 A-B 欄 (波費)
+            if (row[0] && row[1]) {
+                globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]);
+            }
+            // 讀取 D-F 欄 (隊員身份)
+            if (row[3]) {
+                const name = row[3].trim();
+                globalData.members[name] = {
+                    isEmployee: row[4] ? row[4].trim().toUpperCase() === 'TRUE' : false,
+                    isGuest: row[5] ? row[5].trim().toUpperCase() === 'TRUE' : false
+                };
+            }
+        });
+
+        // 2. 讀取 Sessions 工作表 (gid=0)
+        const sessionsUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+        const resSessions = await fetch(sessionsUrl);
+        const textSessions = await resSessions.text();
+        const arrSessions = csvToArray(textSessions);
+        
+        const headers = arrSessions[0].map(h => h.trim());
+        
+        // 解析 Sessions
+        for(let i=1; i<arrSessions.length; i++) {
+            const row = arrSessions[i];
+            if(!row[0]) continue; // 忽略空行
+            
+            let session = {
+                date: row[0].trim(),
+                bookingFee: parseFloat(row[1]) || 0,
+                useShuttle: row[2] ? row[2].trim().toUpperCase() === 'TRUE' : false,
+                guessFee: parseFloat(row[3]) || 0,
+                attendees: []
+            };
+            
+            // 從 E 欄開始檢查邊個有剔 (填 1)
+            for(let j=4; j<headers.length; j++) {
+                if(row[j] && row[j].trim() === '1' && headers[j]) {
+                    session.attendees.push(headers[j]);
+                }
+            }
+            globalData.sessions.push(session);
+        }
+
+        // 3. 初始化下拉選單
+        initSelectors();
+        
+        // 隱藏 Loading，顯示網頁
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        
+        renderBill();
+
+    } catch (error) {
+        document.getElementById('loading').innerHTML = `❌ 讀取失敗，請確保 Google Sheet 已開啟「任何人可檢視」權限！<br>錯誤詳情: ${error}`;
+    }
+}
+
+function initSelectors() {
+    // 填入月份選單 (從波費設定裡找)
+    const monthSelect = document.getElementById('monthSelect');
+    Object.keys(globalData.monthlyShuttle).forEach(m => {
+        let opt = document.createElement('option');
+        opt.value = m;
+        opt.innerHTML = m;
+        monthSelect.appendChild(opt);
+    });
+
+    // 填入人名選單
+    const memberSelect = document.getElementById('memberSelect');
+    Object.keys(globalData.members).forEach(name => {
+        let opt = document.createElement('option');
+        opt.value = name;
+        opt.innerHTML = name;
+        if(name === "Wilson") opt.selected = true; // 預設選取 Wilson 方便驗證
+        memberSelect.appendChild(opt);
+    });
+}
+
+function renderBill() {
+    const selectedMonth = document.getElementById('monthSelect').value; // 例如 "2026-06"
+    const currentName = document.getElementById('memberSelect').value;
+    const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
+    
+    // 轉換月份格式以便比對 Sessions (例如 "2026-06" 匹配 "Jun-26")
+    const monthMap = { "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec" };
+    const mPart = selectedMonth.split('-')[1];
+    const yPart = selectedMonth.split('-')[0].substring(2);
+    const dateKeyword = `${monthMap[mPart]}-${yPart}`; // 變成 "Jun-26"
+
+    // 獲取該月總波費
+    const totalShuttleFee = globalData.monthlyShuttle[selectedMonth] || 0;
+    
+    // 篩選出屬於該月份的場次
+    const monthlySessions = globalData.sessions.filter(s => s.date.includes(dateKeyword));
+    
+    // 計算該月有使用波費的總場數
+    const shuttleSessionsCount = monthlySessions.filter(s => s.useShuttle).length;
+    const shuttleFeePerSession = shuttleSessionsCount > 0 ? (totalShuttleFee / shuttleSessionsCount) : 0;
+
+    let totalNeedToPay = 0;
+    let totalSessionsAttended = 0;
+    let html = "";
+
+    monthlySessions.forEach(session => {
+        if (session.attendees.includes(currentName)) {
+            totalSessionsAttended++;
+            
+            // 1. 場地費分攤
+            const courtShare = session.bookingFee / session.attendees.length;
+            
+            // 2. 羽毛球費分攤 (只有當天有計波費，且這人不是員工)
+            let shuttleShare = 0;
+            if (session.useShuttle && !memberConfig.isEmployee) {
+                // 找出當天有多少個非員工出席（即需要付波費的人）
+                const payingCount = session.attendees.filter(n => globalData.members[n] && !globalData.members[n].isEmployee).length;
+                shuttleShare = payingCount > 0 ? (shuttleFeePerSession / payingCount) : 0;
+            }
+            
+            // 3. Guess Fee (只有當天有設定 Guess Fee，且這人是 Guest)
+            let guessShare = 0;
+            if (session.guessFee > 0 && memberConfig.isGuest) {
+                guessShare = session.guessFee;
+            }
+            
+            const sessionTotal = courtShare + shuttleShare + guessShare;
+            totalNeedToPay += sessionTotal;
+            
+            // 渲染單場卡片
+            html += `
+                <div class="session-card">
+                    <div class="card-header">
+                        <span>📅 ${session.date}</span>
+                        <span style="color:#27ae60;">✔ 已出席</span>
+                    </div>
+                    <div class="card-body">
+                        <div style="color:#888; font-size:12px; margin-bottom:4px;">當日出席 (${session.attendees.length}人): ${session.attendees.join(", ")}</div>
+                        <div class="row-detail">
+                            <span>• 場地費分攤 ($${session.bookingFee.toFixed(2)} ÷ ${session.attendees.length}人)</span>
+                            <span>$${courtShare.toFixed(2)}</span>
+                        </div>
+            `;
+            
+            if (session.useShuttle) {
+                if (memberConfig.isEmployee) {
+                    html += `<div class="row-detail" style="color:#aaa;"><span>• 羽毛球費 <span style="color:#e67e22;">(⭐內部員工豁免)</span></span><span>$0.00</span></div>`;
+                } else {
+                    const payingCount = session.attendees.filter(n => globalData.members[n] && !globalData.members[n].isEmployee).length;
+                    html += `
+                        <div class="row-detail">
+                            <span>• 羽毛球分攤</span>
+                            <span>$${shuttleShare.toFixed(2)}</span>
+                        </div>
+                        <div class="row-detail sub">($${shuttleFeePerSession.toFixed(2)} ÷ 當日 ${payingCount} 位付費者)</div>
+                    `;
+                }
+            }
+            
+            if (guessShare > 0) {
+                html += `
+                    <div class="row-detail" style="color:#e74c3c; font-weight:500;">
+                        <span>• 客串附加費 (Guess Fee)</span>
+                        <span>$${guessShare.toFixed(2)}</span>
+                    </div>
+                `;
+            }
+            
+            html += `
+                        <div class="row-total">
+                            <span>單日小計:</span>
+                            <span>$${sessionTotal.toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    // 更新界面
+    document.getElementById('totalAmount').innerHTML = `$${totalNeedToPay.toFixed(2)}`;
+    document.getElementById('attendanceCount').innerHTML = `本月出席 ${totalSessionsAttended} 場`;
+    document.getElementById('sessionList').innerHTML = html || `<div style="text-align:center;color:#999;padding:40px;">本月此隊員無出席記錄</div>`;
+    
+    // 更新頂部小字
+    let identityText = memberConfig.isEmployee ? " (⭐內部員工)" : (memberConfig.isGuest ? " (👤客串嘉賓)" : "");
+    document.getElementById('headerSub').innerHTML = `${selectedMonth} 月結清單${identityText}`;
+}
+
+// 啟動程式
+initApp();
+</script>
+
+</body>
+</html>
