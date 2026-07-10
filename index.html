@@ -83,12 +83,24 @@
 
         <div class="card-list" id="sessionList"></div>
 
-        <div class="pay-box">
-            📲 支援 <strong>FPS / PayMe</strong> 轉賬至 Lynn<br>
-            <button class="pay-btn" onclick="alert('已複製轉賬號碼！方便你開啟銀行 App 付款。')">一鍵複製轉賬資料</button>
+        <div class="pay-box" style="background: #fdfefe; border: 1px solid #e1e8ed; padding: 16px;">
+            <p style="font-size: 14px; font-weight: bold; margin-bottom: 12px; color: #444;">📲 選擇付款方式</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="pay-btn" style="background: #ff4d4d; margin: 0;" onclick="navigator.clipboard.writeText('61866188'); alert('📋 已成功複製轉賬號碼：61866188！\n方便你隨時開啟銀行 App 進行轉賬。')">
+                    轉賬至 FPS (一鍵複製號碼)
+                </button>
+                
+                <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="window.location.href='https://payme.hsbc/
+https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3>
+                    使用 PayMe 付款 (自動開啟 App)
+                </button>
+                
+                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='https://qr.alipay.hk/https://render.alipay.com/p/yuyan/180020010001270667/landing/income.html?qrcode=https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG>
+                    使用 Alipay 付款 (自動開啟 App)
+                </button>
+            </div>
         </div>
-    </div>
-</div>
 
 <script>
 // 使用你已發佈到網路的公開完整連結（已將其分離成對應分頁格式）
