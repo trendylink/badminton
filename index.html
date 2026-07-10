@@ -87,35 +87,31 @@
             <p style="font-size: 14px; font-weight: bold; margin-bottom: 12px; color: #444;">📲 選擇付款方式</p>
             
             <div style="display: flex; flex-direction: column; gap: 10px;">
-                <!-- 1. FPS 按鈕 -->
                 <button class="pay-btn" style="background: #ff4d4d; margin: 0;" onclick="navigator.clipboard.writeText('61866188'); alert('📋 已成功複製轉賬號碼：61866188！\n方便你隨時開啟銀行 App 進行轉賬。')">
                     轉賬至 FPS (一鍵複製號碼)
                 </button>
                 
-                <!-- 2. PayMe 按鈕 (已修正網址與引號) -->
                 <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="window.location.href='https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3'">
                     使用 PayMe 付款 (自動開啟 App)
                 </button>
                 
-                <!-- 3. Alipay 按鈕 (已修正網址與引號) -->
                 <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='https://render.alipay.com/p/yuyan/180020010001270667/landing/income.html?qrcode=https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG'">
                     使用 Alipay 付款 (自動開啟 App)
                 </button>
             </div>
         </div>
+    </div>
+</div>
 
 <script>
-// 使用你已發佈到網路的公開完整連結（已將其分離成對應分頁格式）
 const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuFlhKFI3yehBB1zp6DdRC17Ysl7hKCFcjj1Pz3tV-qTlaDmbrJGMxSOcZO7JAHnJHyPyMpKFeg/pubhtml';
 
-// 全局數據庫變量
 let globalData = {
     sessions: [],
     monthlyShuttle: {},
     members: {}
 };
 
-// 專門解析 Google Sheet 發佈網頁 CSV 的高效函數
 function csvToArray(text) {
     let p = '', r = [];
     let q = false;
@@ -135,21 +131,17 @@ function csvToArray(text) {
     return r;
 }
 
-// 同步獲取 Google Sheet 數據
 async function initApp() {
     try {
-        // 將公開連結轉換成 CSV 串流獲取格式
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
         
-        // 1. 讀取 Settings 工作表 (gid=1748286950)
         const settingsUrl = `${csvBaseUrl}&gid=1748286950`;
         const resSettings = await fetch(settingsUrl);
         const textSettings = await resSettings.text();
         const arrSettings = csvToArray(textSettings);
         
-        // 解析 Settings
         arrSettings.forEach((row, index) => {
-            if (index === 0) return; // 跳過 Header
+            if (index === 0) return;
             if (row[0] && row[1]) {
                 globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]);
             }
@@ -162,7 +154,6 @@ async function initApp() {
             }
         });
 
-        // 2. 讀取 Sessions 工作表 (gid=0)
         const sessionsUrl = `${csvBaseUrl}&gid=0`;
         const resSessions = await fetch(sessionsUrl);
         const textSessions = await resSessions.text();
@@ -170,10 +161,9 @@ async function initApp() {
         
         const headers = arrSessions[0].map(h => h.trim());
         
-        // 解析 Sessions
         for(let i=1; i<arrSessions.length; i++) {
             const row = arrSessions[i];
-            if(!row[0]) continue; // 忽略空行
+            if(!row[0]) continue;
             
             let session = {
                 date: row[0].trim(),
@@ -191,10 +181,8 @@ async function initApp() {
             globalData.sessions.push(session);
         }
 
-        // 3. 初始化下拉選單
         initSelectors();
         
-        // 隱藏 Loading，顯示網頁
         document.getElementById('loading').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         
@@ -219,7 +207,7 @@ function initSelectors() {
         let opt = document.createElement('option');
         opt.value = name;
         opt.innerHTML = name;
-        if(name === "Wilson") opt.selected = true; // 預設選取 Wilson
+        if(name === "Wilson") opt.selected = true;
         memberSelect.appendChild(opt);
     });
 }
