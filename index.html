@@ -95,7 +95,7 @@
                     使用 PayMe 付款 (自動開啟 App)
                 </button>
                 
-                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG'">
+                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='alipays://platformapi/startapp?appId=20000067&url=https%3A%2F%2Fqr.alipay.hk%2F281004010496IPnb5AYmN49jpe8Zkbb48dyG'">
                     使用 Alipay 付款 (自動開啟 App)
                 </button>
             </div>
@@ -104,7 +104,8 @@
 </div>
 
 <script>
-const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuELhKEl3yeHBB1zp6DdRC12Ysl7hKCFejj1Pz3tV-qTIaDmbrJGMxS0cZ07jAHnJHyPyMpKFeg/pubhtml';
+// 💡 修正了被打錯字的 Google Sheet 真實網址
+const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuFlhKFI3yehBB1zp6DdRC17Ysl7hKCFcjj1Pz3tV-qTlaDmbrJGMxSOcZO7JAHnJHyPyMpKFeg/pubhtml';
 
 let globalData = {
     sessions: [],
@@ -143,7 +144,7 @@ async function initApp() {
         arrSettings.forEach((row, index) => {
             if (index === 0) return;
             if (row[0] && row[1]) {
-                globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]);
+                globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]) || 0;
             }
             if (row[3]) {
                 const name = row[3].trim();
@@ -195,6 +196,7 @@ async function initApp() {
 
 function initSelectors() {
     const monthSelect = document.getElementById('monthSelect');
+    monthSelect.innerHTML = ""; 
     Object.keys(globalData.monthlyShuttle).forEach(m => {
         let opt = document.createElement('option');
         opt.value = m;
@@ -203,43 +205,41 @@ function initSelectors() {
     });
 
     const memberSelect = document.getElementById('memberSelect');
+    memberSelect.innerHTML = ""; 
     Object.keys(globalData.members).forEach(name => {
         let opt = document.createElement('option');
         opt.value = name;
         opt.innerHTML = name;
-        if(name === "Wilson") opt.selected = true;
+        // 💡 預設自動選取名單上有出席數據的 Alex
+        if(name === "Alex") opt.selected = true;
         memberSelect.appendChild(opt);
     });
 }
 
 function renderBill() {
-    const selectedMonth = document.getElementById('monthSelect').value; // 格式如 "2026-06"
+    const selectedMonth = document.getElementById('monthSelect').value; 
     const currentName = document.getElementById('memberSelect').value;
     const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
     
-    // 1. 解析出選擇的年份和月份數字
-    const [selYear, selMonth] = selectedMonth.split('-'); // "2026", "06"
-    const selMonthInt = parseInt(selMonth, 10); // 轉成數字 6
+    if(!selectedMonth || !currentName) return;
+
+    const [selYear, selMonth] = selectedMonth.split('-'); 
+    const selMonthInt = parseInt(selMonth, 10); 
     
-    // 2. 獲取羽毛球月費
     const totalShuttleFee = globalData.monthlyShuttle[selectedMonth] || 0;
     
-    // 3. 關鍵修復：同時支援 "2026/6/x", "2026-06-x" 或是 "Jun-26" 的多重日期比對邏輯！
     const monthMap = { "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec" };
-    const dateKeywordShort = `${monthMap[selMonth]}-${selYear.substring(2)}`; // 如 "Jun-26"
+    const dateKeywordShort = `${monthMap[selMonth]}-${selYear.substring(2)}`; 
 
     const monthlySessions = globalData.sessions.filter(s => {
         const dStr = s.date;
-        // 如果日期包含 "Jun-26"
         if (dStr.includes(dateKeywordShort)) return true;
         
-        // 如果日期是標準 ISO 或斜線格式 (例如 2026/6/13 或 2026-06-13)
         const parsedDate = new Date(dStr);
         if (!isNaN(parsedDate.getTime())) {
             return parsedDate.getFullYear() === parseInt(selYear, 10) && (parsedDate.getMonth() + 1) === selMonthInt;
         }
         
-        // 萬一以上皆非，嘗試用純文字包含比對（相容手打文字）
         return dStr.includes(`/${selMonthInt}/`) || dStr.includes(`/${selMonth}/`) || dStr.includes(`-${selMonth}-`);
     });
     
@@ -326,6 +326,7 @@ function renderBill() {
     let identityText = memberConfig.isEmployee ? " (⭐內部員工)" : (memberConfig.isGuest ? " (👤客串嘉賓)" : "");
     document.getElementById('headerSub').innerHTML = `${selectedMonth} 月結清單${identityText}`;
 }
+
 initApp();
 </script>
 </body>
