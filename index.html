@@ -104,8 +104,8 @@
 </div>
 
 <script>
-// 💡 修正了被打錯字的 Google Sheet 真實網址
-const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuFlhKFI3yehBB1zp6DdRC17Ysl7hKCFcjj1Pz3tV-qTlaDmbrJGMxSOcZO7JAHnJHyPyMpKFeg/pubhtml';
+// 💡 使用你正確的 Google Sheet 長發佈 ID
+const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuELhKEl3yeHBB1zp6DdRC12Ysl7hKCFejj1Pz3tV-qTIaDmbrJGMxS0cZ07jAHnJHyPyMpKFeg/pubhtml';
 
 let globalData = {
     sessions: [],
@@ -136,6 +136,7 @@ async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
         
+        // 1. 讀取 Settings 分頁 (gid=1748286950)
         const settingsUrl = `${csvBaseUrl}&gid=1748286950`;
         const resSettings = await fetch(settingsUrl);
         const textSettings = await resSettings.text();
@@ -143,6 +144,8 @@ async function initApp() {
         
         arrSettings.forEach((row, index) => {
             if (index === 0) return;
+            if (row[0] && row[0].includes('<!DOCTYPE')) return; // 防止 HTML 污染
+            
             if (row[0] && row[1]) {
                 globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]) || 0;
             }
@@ -155,6 +158,7 @@ async function initApp() {
             }
         });
 
+        // 2. 讀取 Sessions 分頁 (gid=0)
         const sessionsUrl = `${csvBaseUrl}&gid=0`;
         const resSessions = await fetch(sessionsUrl);
         const textSessions = await resSessions.text();
@@ -164,7 +168,7 @@ async function initApp() {
         
         for(let i=1; i<arrSessions.length; i++) {
             const row = arrSessions[i];
-            if(!row[0]) continue;
+            if(!row[0] || row[0].includes('<!DOCTYPE')) continue;
             
             let session = {
                 date: row[0].trim(),
@@ -190,7 +194,7 @@ async function initApp() {
         renderBill();
 
     } catch (error) {
-        document.getElementById('loading').innerHTML = `❌ 數據穿透失敗！請檢查 Google 試算表是否已點選「發佈到網路」。<br>錯誤詳情: ${error}`;
+        document.getElementById('loading').innerHTML = `❌ 數據穿透失敗！請檢查試算表發佈設定。<br>錯誤詳情: ${error}`;
     }
 }
 
@@ -210,37 +214,33 @@ function initSelectors() {
         let opt = document.createElement('option');
         opt.value = name;
         opt.innerHTML = name;
-        // 💡 預設自動選取名單上有出席數據的 Alex
+        // 💡 預設選取有出席明細的 Alex
         if(name === "Alex") opt.selected = true;
         memberSelect.appendChild(opt);
     });
 }
 
 function renderBill() {
-    const selectedMonth = document.getElementById('monthSelect').value; 
+    const selectedMonth = document.getElementById('monthSelect').value; // 例如 "Jun-2026"
     const currentName = document.getElementById('memberSelect').value;
     const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
     
     if(!selectedMonth || !currentName) return;
 
-    const [selYear, selMonth] = selectedMonth.split('-'); 
-    const selMonthInt = parseInt(selMonth, 10); 
+    // 解析包含 "Jun-2026" 或 "2026-06" 的不同可能
+    let dateKeywordShort = selectedMonth; 
+    if (selectedMonth.includes('-')) {
+        const parts = selectedMonth.split('-');
+        if (parts[0].length === 3) { // 格式為 "Jun-2026"
+            dateKeywordShort = `${parts[0]}-${parts[1].substring(2)}`; // 變成 "Jun-26"
+        }
+    }
     
     const totalShuttleFee = globalData.monthlyShuttle[selectedMonth] || 0;
     
-    const monthMap = { "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec" };
-    const dateKeywordShort = `${monthMap[selMonth]}-${selYear.substring(2)}`; 
-
+    // 過濾出屬於該月份的場次
     const monthlySessions = globalData.sessions.filter(s => {
-        const dStr = s.date;
-        if (dStr.includes(dateKeywordShort)) return true;
-        
-        const parsedDate = new Date(dStr);
-        if (!isNaN(parsedDate.getTime())) {
-            return parsedDate.getFullYear() === parseInt(selYear, 10) && (parsedDate.getMonth() + 1) === selMonthInt;
-        }
-        
-        return dStr.includes(`/${selMonthInt}/`) || dStr.includes(`/${selMonth}/`) || dStr.includes(`-${selMonth}-`);
+        return s.date.toLowerCase().includes(dateKeywordShort.toLowerCase());
     });
     
     const shuttleSessionsCount = monthlySessions.filter(s => s.useShuttle).length;
