@@ -24,10 +24,14 @@
         .main-content { padding: 16px; }
         
         /* 總數卡片 */
-        .summary-card { background: #fff5f5; border: 1px solid #ffe3e3; border-left: 6px solid #ff4d4d; padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .summary-card { background: #fff5f5; border: 1px solid #ffe3e3; border-left: 6px solid #ff4d4d; padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; transition: all 0.3s ease; }
+        .summary-card.is-paid { background: #f4fbf7; border: 1px solid #d1f2e1; border-left: 6px solid #27ae60; }
         .total-label { font-size: 14px; color: #666; font-weight: 500; }
         .total-amount { font-size: 32px; font-weight: bold; color: #ff4d4d; }
-        .status-badge { background: #ff4d4d; color: white; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; display: inline-block; margin-top: 4px; }
+        .summary-card.is-paid .total-amount { color: #27ae60; }
+        .status-badge { color: white; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; display: inline-block; margin-top: 4px; }
+        .status-badge.unpaid { background: #ff4d4d; }
+        .status-badge.paid { background: #27ae60; }
 
         /* 列表標題 */
         .section-title { font-size: 15px; color: #666; font-weight: bold; margin-bottom: 12px; display: flex; justify-content: space-between; }
@@ -68,10 +72,10 @@
     </div>
 
     <div class="main-content">
-        <div class="summary-card">
+        <div class="summary-card" id="summaryCard">
             <div>
                 <span class="total-label">本月應付總額</span><br>
-                <span class="status-badge">🔴 未付款</span>
+                <span id="statusBadge" class="status-badge unpaid">🔴 未付款</span>
             </div>
             <div class="total-amount" id="totalAmount">$0.00</div>
         </div>
@@ -83,7 +87,7 @@
 
         <div class="card-list" id="sessionList"></div>
 
-        <div class="pay-box" style="background: #fdfefe; border: 1px solid #e1e8ed; padding: 16px;">
+        <div class="pay-box" id="payBox" style="background: #fdfefe; border: 1px solid #e1e8ed; padding: 16px;">
             <p style="font-size: 14px; font-weight: bold; margin-bottom: 12px; color: #444;">📲 選擇付款方式</p>
             
             <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -91,13 +95,13 @@
                     轉賬至 FPS (一鍵複製號碼)
                 </button>
                 
-                <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="window.location.href='https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3'">
-                    使用 PayMe 付款 (自動開啟 App)
+                <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="const amt = document.getElementById('totalAmount').innerText.replace('$',''); navigator.clipboard.writeText(amt); alert('📋 已為你自動複製應付金額：$' + amt + ' ！\n即將開啟 PayMe，進入後直接貼上金額即可。'); window.location.href='https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3'">
+                    使用 PayMe 付款 (自動複製金額)
                 </button>
                 
-                <a class="pay-btn" style="background: #00a4e4; margin: 0; text-align: center;" href="https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG" target="_blank">
-                    使用 Alipay 付款 (自動開啟 App)
-                </a>
+                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="const amt = document.getElementById('totalAmount').innerText.replace('$',''); navigator.clipboard.writeText(amt); alert('📋 已為你自動複製應付金額：$' + amt + ' ！\n即將開啟 Alipay，進入後直接貼上金額即可。'); window.open('https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG', '_blank')">
+                    使用 Alipay 付款 (自動複製金額)
+                </button>
             </div>
         </div>
     </div>
@@ -108,8 +112,8 @@ const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvu
 
 let globalData = {
     sessions: [],
-    monthlyShuttle: {},
-    members: {}
+    monthlyShuttle: {}, // { "Jun-2026": 170.00 }
+    members: {}         // { "Wilson": { isEmployee: false, isGuest: true, isPaid: true } }
 };
 
 function csvToArray(text) {
@@ -135,52 +139,69 @@ async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
         
-        const settingsUrl = `${csvBaseUrl}&gid=2024390252`;
-        const resSettings = await fetch(settingsUrl);
+        // 1. 讀取 Settings 工作表 (gid=2024390252)
+        const resSettings = await fetch(`${csvBaseUrl}&gid=2024390252`);
         const textSettings = await resSettings.text();
         const arrSettings = csvToArray(textSettings);
         
+        let lastSeenMonth = ""; // 用於自動遞補留白的月份
+        
         arrSettings.forEach((row, index) => {
-            if (index === 0) return;
-            if (row[0] && row[0].trim() !== "") {
-                globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]) || 0;
+            if (index === 0) return; // 跳過第一行標題
+            
+            // 安全清洗與獲取每一欄的值
+            let mCol = row[0] ? row[0].trim() : "";
+            let feeCol = row[1] ? row[1].trim() : "";
+            let nameCol = row[3] ? row[3].trim() : "";
+            let empCol = row[4] ? row[4].trim().toUpperCase() : "";
+            let gstCol = row[5] ? row[5].trim().toUpperCase() : "";
+            let paidCol = row[6] ? row[6].trim().toUpperCase() : "";
+            
+            // 邏輯 1：解算月球總費（記住有填寫的那一行）
+            if (mCol !== "" && !mCol.includes("function") && !mCol.includes("Object")) {
+                lastSeenMonth = mCol;
+                globalData.monthlyShuttle[lastSeenMonth] = parseFloat(feeCol) || 0;
             }
-            if (row[3]) {
-                const name = row[3].trim();
-                globalData.members[name] = {
-                    isEmployee: row[4] ? row[4].trim().toUpperCase() === 'TRUE' : false,
-                    isGuest: row[5] ? row[5].trim().toUpperCase() === 'TRUE' : false
+            
+            // 邏輯 2：解算隊員名單
+            if (nameCol !== "" && !nameCol.includes("function") && !nameCol.includes("Object")) {
+                globalData.members[nameCol] = {
+                    isEmployee: empCol === 'TRUE',
+                    isGuest: gstCol === 'TRUE',
+                    isPaid: paidCol === 'TRUE'
                 };
             }
         });
 
-        const sessionsUrl = `${csvBaseUrl}&gid=0`;
-        const resSessions = await fetch(sessionsUrl);
+        // 2. 讀取 Sessions 工作表 (gid=0)
+        const resSessions = await fetch(`${csvBaseUrl}&gid=0`);
         const textSessions = await resSessions.text();
         const arrSessions = csvToArray(textSessions);
         
-        const headers = arrSessions[0].map(h => h.trim());
+        const headers = arrSessions[0].map(h => h ? h.trim() : "");
         
         for(let i=1; i<arrSessions.length; i++) {
             const row = arrSessions[i];
-            if(!row[0] || row[0].trim() === "") continue;
+            if(!row[0] || row[0].trim() === "" || row[0].includes("function")) continue;
             
             let session = {
                 date: row[0].trim(),
                 bookingFee: parseFloat(row[1]) || 0,
                 useShuttle: row[2] ? row[2].trim().toUpperCase() === 'TRUE' : false,
-                guessFee: parseFloat(row[3]) || 0, // We read column D layout, but dynamic calculations will handle the logic
+                guessFee: parseFloat(row[3]) || 0,
                 attendees: []
             };
             
+            // 讀取打勾 '1' 的出席人員
             for(let j=4; j<headers.length; j++) {
-                if(row[j] && row[j].trim() === '1' && headers[j]) {
+                if(row[j] && row[j].trim() === '1' && headers[j] && !headers[j].includes("function")) {
                     session.attendees.push(headers[j]);
                 }
             }
             globalData.sessions.push(session);
         }
 
+        // 初始化下拉選單
         initSelectors();
         
         document.getElementById('loading').style.display = 'none';
@@ -189,7 +210,7 @@ async function initApp() {
         renderBill();
 
     } catch (error) {
-        document.getElementById('loading').innerHTML = `❌ 數據穿透失敗！請確保試算表已「發佈到網路」。<br>錯誤詳情: ${error}`;
+        document.getElementById('loading').innerHTML = `❌ 數據解析失敗，請確保試算表已發佈！<br>錯誤詳情: ${error}`;
     }
 }
 
@@ -217,7 +238,7 @@ function initSelectors() {
 function renderBill() {
     const selectedMonth = document.getElementById('monthSelect').value; 
     const currentName = document.getElementById('memberSelect').value;
-    const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
+    const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false, isPaid: false };
     
     if(!selectedMonth || !currentName) return;
 
@@ -245,17 +266,13 @@ function renderBill() {
         if (session.attendees.includes(currentName)) {
             totalSessionsAttended++;
             
-            // 1. Court Fee split among everyone present
             const courtShare = session.bookingFee / session.attendees.length;
             
-            // 2. Shuttle Fee split accurately among ALL attendees present
             let shuttleShare = 0;
             if (session.useShuttle && session.attendees.length > 0) {
                 shuttleShare = shuttleFeePerSession / session.attendees.length;
             }
             
-            // 3. New Fixed Guess Fee Calculation logic:
-            // If currently viewed person is a Guest, they pay flat $10.00. Employees/Members pay $0.
             let guessShare = 0;
             if (memberConfig.isGuest) {
                 guessShare = 10.00;
@@ -311,6 +328,23 @@ function renderBill() {
     document.getElementById('totalAmount').innerHTML = `$${totalNeedToPay.toFixed(2)}`;
     document.getElementById('attendanceCount').innerHTML = `本月出席 ${totalSessionsAttended} 場`;
     document.getElementById('sessionList').innerHTML = html || `<div style="text-align:center;color:#999;padding:40px;">本月此隊員無出席記錄</div>`;
+    
+    // 控制 已付款/未付款 UI 面板狀態與顯示
+    const summaryCard = document.getElementById('summaryCard');
+    const statusBadge = document.getElementById('statusBadge');
+    const payBox = document.getElementById('payBox');
+
+    if (memberConfig.isPaid) {
+        summaryCard.classList.add('is-paid');
+        statusBadge.innerHTML = "🟢 已付款";
+        statusBadge.className = "status-badge paid";
+        payBox.style.display = "none";
+    } else {
+        summaryCard.classList.remove('is-paid');
+        statusBadge.innerHTML = "🔴 未付款";
+        statusBadge.className = "status-badge unpaid";
+        payBox.style.display = "block";
+    }
     
     let identityText = memberConfig.isEmployee ? " (⭐內部員工)" : (memberConfig.isGuest ? " (👤客串嘉賓)" : "");
     document.getElementById('headerSub').innerHTML = `${selectedMonth} 月結清單${identityText}`;
