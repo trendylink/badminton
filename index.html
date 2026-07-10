@@ -27,11 +27,16 @@
         .summary-card { background: #fff5f5; border: 1px solid #ffe3e3; border-left: 6px solid #ff4d4d; padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; transition: all 0.3s ease; }
         .summary-card.is-paid { background: #f4fbf7; border: 1px solid #d1f2e1; border-left: 6px solid #27ae60; }
         .total-label { font-size: 14px; color: #666; font-weight: 500; }
-        .total-amount { font-size: 32px; font-weight: bold; color: #ff4d4d; }
+        .total-amount-box { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+        .total-amount { font-size: 32px; font-weight: bold; color: #ff4d4d; line-height: 1.1; }
         .summary-card.is-paid .total-amount { color: #27ae60; }
         .status-badge { color: white; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; display: inline-block; margin-top: 4px; }
         .status-badge.unpaid { background: #ff4d4d; }
         .status-badge.paid { background: #27ae60; }
+
+        /* 📋 新增的複製金額按鈕樣式 */
+        .copy-amt-btn { background: rgba(0,0,0,0.05); color: #555; border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 2px; transition: background 0.2s; }
+        .copy-amt-btn:hover { background: rgba(0,0,0,0.1); }
 
         /* 列表標題 */
         .section-title { font-size: 15px; color: #666; font-weight: bold; margin-bottom: 12px; display: flex; justify-content: space-between; }
@@ -77,7 +82,10 @@
                 <span class="total-label">本月應付總額</span><br>
                 <span id="statusBadge" class="status-badge unpaid">🔴 未付款</span>
             </div>
-            <div class="total-amount" id="totalAmount">$0.00</div>
+            <div class="total-amount-box">
+                <span class="total-amount" id="totalAmount">$0.00</span>
+                <button class="copy-amt-btn" id="copyAmtBtn" onclick="copyCurrentAmount()" style="display: none;">📋 複製金額</button>
+            </div>
         </div>
 
         <div class="section-title">
@@ -113,7 +121,8 @@ const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvu
 let globalData = {
     sessions: [],
     monthlyShuttle: {}, 
-    members: {}         
+    members: {},
+    settingsHeaders: [] 
 };
 
 function csvToArray(text) {
@@ -135,6 +144,15 @@ function csvToArray(text) {
     return r;
 }
 
+// 🌟 新增：複製金額的觸發函式
+function copyCurrentAmount() {
+    const amtText = document.getElementById('totalAmount').innerText.replace('$', '').trim();
+    if(amtText && amtText !== "0.00") {
+        navigator.clipboard.writeText(amtText);
+        alert(`📋 已成功複製應付金額：$${amtText}`);
+    }
+}
+
 async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
@@ -142,6 +160,8 @@ async function initApp() {
         const resSettings = await fetch(`${csvBaseUrl}&gid=2024390252`);
         const textSettings = await resSettings.text();
         const arrSettings = csvToArray(textSettings);
+        
+        globalData.settingsHeaders = arrSettings[0].map(h => h ? h.trim() : "");
         
         let lastSeenMonth = ""; 
         
@@ -153,7 +173,6 @@ async function initApp() {
             let nameCol = row[3] ? row[3].trim() : "";
             let empCol = row[4] ? row[4].trim().toUpperCase() : "";
             let gstCol = row[5] ? row[5].trim().toUpperCase() : "";
-            let paidCol = row[6] ? row[6].trim().toUpperCase() : "";
             
             if (mCol !== "" && !mCol.includes("function") && !mCol.includes("Object")) {
                 lastSeenMonth = mCol;
@@ -164,7 +183,7 @@ async function initApp() {
                 globalData.members[nameCol] = {
                     isEmployee: empCol === 'TRUE',
                     isGuest: gstCol === 'TRUE',
-                    isPaid: paidCol === 'TRUE'
+                    rawRowData: row 
                 };
             }
         });
@@ -200,7 +219,7 @@ async function initApp() {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         
-        renderBill(); // 初始呼叫，會顯示空白預設畫面
+        renderBill(); 
 
     } catch (error) {
         document.getElementById('loading').innerHTML = `❌ 數據解析失敗，請確保試算表已發佈！<br>錯誤詳情: ${error}`;
@@ -211,7 +230,6 @@ function initSelectors() {
     const monthSelect = document.getElementById('monthSelect');
     monthSelect.innerHTML = "";
     
-    // 🌟 月份加入 "-" 預設空選項
     let mBlank = document.createElement('option');
     mBlank.value = "-";
     mBlank.innerHTML = "-";
@@ -227,7 +245,6 @@ function initSelectors() {
     const memberSelect = document.getElementById('memberSelect');
     memberSelect.innerHTML = "";
     
-    // 🌟 隊員加入 "-" 預設空選項，不自動選擇 Wilson
     let memBlank = document.createElement('option');
     memBlank.value = "-";
     memBlank.innerHTML = "-";
@@ -248,8 +265,8 @@ function renderBill() {
     const summaryCard = document.getElementById('summaryCard');
     const statusBadge = document.getElementById('statusBadge');
     const payBox = document.getElementById('payBox');
+    const copyAmtBtn = document.getElementById('copyAmtBtn');
     
-    // 🌟 如果使用者選擇的是 "-"，直接將介面清空為初始狀態，不顯示任何計算
     if (selectedMonth === "-" || currentName === "-") {
         document.getElementById('totalAmount').innerHTML = "$0.00";
         document.getElementById('attendanceCount').innerHTML = "";
@@ -260,10 +277,19 @@ function renderBill() {
         statusBadge.innerHTML = "🔴 未付款";
         statusBadge.className = "status-badge unpaid";
         payBox.style.display = "none";
+        copyAmtBtn.style.display = "none"; // 隱藏複製按鈕
         return;
     }
 
-    const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false, isPaid: false };
+    const memberConfig = globalData.members[currentName];
+
+    const targetHeaderName = `Paid_${selectedMonth}`;
+    const paidColumnIndex = globalData.settingsHeaders.indexOf(targetHeaderName);
+    
+    let isPaid = false;
+    if (paidColumnIndex !== -1 && memberConfig.rawRowData[paidColumnIndex]) {
+        isPaid = memberConfig.rawRowData[paidColumnIndex].trim().toUpperCase() === 'TRUE';
+    }
 
     let dateKeywordShort = selectedMonth; 
     if (selectedMonth.includes('-')) {
@@ -352,16 +378,24 @@ function renderBill() {
     document.getElementById('attendanceCount').innerHTML = `本月出席 ${totalSessionsAttended} 場`;
     document.getElementById('sessionList').innerHTML = html || `<div style="text-align:center;color:#999;padding:40px;">本月此隊員無出席記錄</div>`;
     
-    if (memberConfig.isPaid) {
+    if (isPaid) {
         summaryCard.classList.add('is-paid');
         statusBadge.innerHTML = "🟢 已付款";
         statusBadge.className = "status-badge paid";
         payBox.style.display = "none";
+        copyAmtBtn.style.display = "none"; // 已付款就不需要複製金額了
     } else {
         summaryCard.classList.remove('is-paid');
         statusBadge.innerHTML = "🔴 未付款";
         statusBadge.className = "status-badge unpaid";
         payBox.style.display = "block";
+        
+        // 只有在未付款且金額大於 0 時，才顯示複製金額按鈕
+        if(totalNeedToPay > 0) {
+            copyAmtBtn.style.display = "block";
+        } else {
+            copyAmtBtn.style.display = "none";
+        }
     }
     
     let identityText = memberConfig.isEmployee ? " (⭐內部員工)" : (memberConfig.isGuest ? " (👤客串嘉賓)" : "");
