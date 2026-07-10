@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>羽毛球雲端月結神器</title>
+    <title>羽毛球結算表</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
         body { background-color: #f5f7fb; color: #333; padding: 12px; display: flex; justify-content: center; }
@@ -91,8 +91,8 @@
 </div>
 
 <script>
-// 你的 Google Sheet 身份證 ID
-const SHEET_ID = '1ShZbbdNjugrcz-_Ie4Vk6h7niCpwlZqaamR865HwKH0';
+// 使用你已發佈到網路的公開完整連結（已將其分離成對應分頁格式）
+const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuFlhKFI3yehBB1zp6DdRC17Ysl7hKCFcjj1Pz3tV-qTlaDmbrJGMxSOcZO7JAHnJHyPyMpKFeg/pubhtml';
 
 // 全局數據庫變量
 let globalData = {
@@ -101,7 +101,7 @@ let globalData = {
     members: {}
 };
 
-// 輔助函式：將 Google Sheet 導出的 CSV 轉成 Array
+// 專門解析 Google Sheet 發佈網頁 CSV 的高效函數
 function csvToArray(text) {
     let p = '', r = [];
     let q = false;
@@ -124,8 +124,11 @@ function csvToArray(text) {
 // 同步獲取 Google Sheet 數據
 async function initApp() {
     try {
+        // 將公開連結轉換成 CSV 串流獲取格式
+        const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
+        
         // 1. 讀取 Settings 工作表 (gid=1748286950)
-        const settingsUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=1748286950`;
+        const settingsUrl = `${csvBaseUrl}&gid=1748286950`;
         const resSettings = await fetch(settingsUrl);
         const textSettings = await resSettings.text();
         const arrSettings = csvToArray(textSettings);
@@ -133,11 +136,9 @@ async function initApp() {
         // 解析 Settings
         arrSettings.forEach((row, index) => {
             if (index === 0) return; // 跳過 Header
-            // 讀取 A-B 欄 (波費)
             if (row[0] && row[1]) {
                 globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]);
             }
-            // 讀取 D-F 欄 (隊員身份)
             if (row[3]) {
                 const name = row[3].trim();
                 globalData.members[name] = {
@@ -148,7 +149,7 @@ async function initApp() {
         });
 
         // 2. 讀取 Sessions 工作表 (gid=0)
-        const sessionsUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+        const sessionsUrl = `${csvBaseUrl}&gid=0`;
         const resSessions = await fetch(sessionsUrl);
         const textSessions = await resSessions.text();
         const arrSessions = csvToArray(textSessions);
@@ -168,7 +169,6 @@ async function initApp() {
                 attendees: []
             };
             
-            // 從 E 欄開始檢查邊個有剔 (填 1)
             for(let j=4; j<headers.length; j++) {
                 if(row[j] && row[j].trim() === '1' && headers[j]) {
                     session.attendees.push(headers[j]);
@@ -187,12 +187,11 @@ async function initApp() {
         renderBill();
 
     } catch (error) {
-        document.getElementById('loading').innerHTML = `❌ 讀取失敗，請確保 Google Sheet 已開啟「任何人可檢視」權限！<br>錯誤詳情: ${error}`;
+        document.getElementById('loading').innerHTML = `❌ 數據穿透失敗！請檢查 Google 試算表是否已點選「發佈到網路」。<br>錯誤詳情: ${error}`;
     }
 }
 
 function initSelectors() {
-    // 填入月份選單 (從波費設定裡找)
     const monthSelect = document.getElementById('monthSelect');
     Object.keys(globalData.monthlyShuttle).forEach(m => {
         let opt = document.createElement('option');
@@ -201,35 +200,29 @@ function initSelectors() {
         monthSelect.appendChild(opt);
     });
 
-    // 填入人名選單
     const memberSelect = document.getElementById('memberSelect');
     Object.keys(globalData.members).forEach(name => {
         let opt = document.createElement('option');
         opt.value = name;
         opt.innerHTML = name;
-        if(name === "Wilson") opt.selected = true; // 預設選取 Wilson 方便驗證
+        if(name === "Wilson") opt.selected = true; // 預設選取 Wilson
         memberSelect.appendChild(opt);
     });
 }
 
 function renderBill() {
-    const selectedMonth = document.getElementById('monthSelect').value; // 例如 "2026-06"
+    const selectedMonth = document.getElementById('monthSelect').value;
     const currentName = document.getElementById('memberSelect').value;
     const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
     
-    // 轉換月份格式以便比對 Sessions (例如 "2026-06" 匹配 "Jun-26")
     const monthMap = { "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec" };
     const mPart = selectedMonth.split('-')[1];
     const yPart = selectedMonth.split('-')[0].substring(2);
-    const dateKeyword = `${monthMap[mPart]}-${yPart}`; // 變成 "Jun-26"
+    const dateKeyword = `${monthMap[mPart]}-${yPart}`;
 
-    // 獲取該月總波費
     const totalShuttleFee = globalData.monthlyShuttle[selectedMonth] || 0;
-    
-    // 篩選出屬於該月份的場次
     const monthlySessions = globalData.sessions.filter(s => s.date.includes(dateKeyword));
     
-    // 計算該月有使用波費的總場數
     const shuttleSessionsCount = monthlySessions.filter(s => s.useShuttle).length;
     const shuttleFeePerSession = shuttleSessionsCount > 0 ? (totalShuttleFee / shuttleSessionsCount) : 0;
 
@@ -241,18 +234,14 @@ function renderBill() {
         if (session.attendees.includes(currentName)) {
             totalSessionsAttended++;
             
-            // 1. 場地費分攤
             const courtShare = session.bookingFee / session.attendees.length;
             
-            // 2. 羽毛球費分攤 (只有當天有計波費，且這人不是員工)
             let shuttleShare = 0;
             if (session.useShuttle && !memberConfig.isEmployee) {
-                // 找出當天有多少個非員工出席（即需要付波費的人）
                 const payingCount = session.attendees.filter(n => globalData.members[n] && !globalData.members[n].isEmployee).length;
                 shuttleShare = payingCount > 0 ? (shuttleFeePerSession / payingCount) : 0;
             }
             
-            // 3. Guess Fee (只有當天有設定 Guess Fee，且這人是 Guest)
             let guessShare = 0;
             if (session.guessFee > 0 && memberConfig.isGuest) {
                 guessShare = session.guessFee;
@@ -261,7 +250,6 @@ function renderBill() {
             const sessionTotal = courtShare + shuttleShare + guessShare;
             totalNeedToPay += sessionTotal;
             
-            // 渲染單場卡片
             html += `
                 <div class="session-card">
                     <div class="card-header">
@@ -311,19 +299,15 @@ function renderBill() {
         }
     });
 
-    // 更新界面
     document.getElementById('totalAmount').innerHTML = `$${totalNeedToPay.toFixed(2)}`;
     document.getElementById('attendanceCount').innerHTML = `本月出席 ${totalSessionsAttended} 場`;
     document.getElementById('sessionList').innerHTML = html || `<div style="text-align:center;color:#999;padding:40px;">本月此隊員無出席記錄</div>`;
     
-    // 更新頂部小字
     let identityText = memberConfig.isEmployee ? " (⭐內部員工)" : (memberConfig.isGuest ? " (👤客串嘉賓)" : "");
     document.getElementById('headerSub').innerHTML = `${selectedMonth} 月結清單${identityText}`;
 }
-.
-// 啟動程式
+
 initApp();
 </script>
-
 </body>
 </html>
