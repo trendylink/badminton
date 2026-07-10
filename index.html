@@ -104,7 +104,6 @@
 </div>
 
 <script>
-// 使用你提供給我的正式 Google 網路發佈網址
 const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuELhKEl3yeHBB1zp6DdRC12Ysl7hKCFejj1Pz3tV-qTIaDmbrJGMxS0cZ07jAHnJHyPyMpKFeg/pubhtml';
 
 let globalData = {
@@ -136,7 +135,6 @@ async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
         
-        // 🛠️ 修正 1：更換為你試算表中真實的 Settings 分頁 gid (2024390252)
         const settingsUrl = `${csvBaseUrl}&gid=2024390252`;
         const resSettings = await fetch(settingsUrl);
         const textSettings = await resSettings.text();
@@ -156,7 +154,6 @@ async function initApp() {
             }
         });
 
-        // 讀取 Sessions 分頁 (gid=0)
         const sessionsUrl = `${csvBaseUrl}&gid=0`;
         const resSessions = await fetch(sessionsUrl);
         const textSessions = await resSessions.text();
@@ -218,18 +215,17 @@ function initSelectors() {
 }
 
 function renderBill() {
-    const selectedMonth = document.getElementById('monthSelect').value; // 取得 "Jun-2026"
+    const selectedMonth = document.getElementById('monthSelect').value; 
     const currentName = document.getElementById('memberSelect').value;
     const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
     
     if(!selectedMonth || !currentName) return;
 
-    // 🛠️ 修正 2：優化日期關鍵字匹配邏輯。直接將 "Jun-2026" 轉換成簡寫 "Jun-26" 去比對場次表
     let dateKeywordShort = selectedMonth; 
     if (selectedMonth.includes('-')) {
-        const parts = selectedMonth.split('-'); // ["Jun", "2026"]
+        const parts = selectedMonth.split('-'); 
         if (parts.length === 2 && isNaN(parts[0])) { 
-            dateKeywordShort = `${parts[0]}-${parts[1].substring(2)}`; // 生成 "Jun-26"
+            dateKeywordShort = `${parts[0]}-${parts[1].substring(2)}`; 
         }
     }
 
@@ -249,14 +245,16 @@ function renderBill() {
         if (session.attendees.includes(currentName)) {
             totalSessionsAttended++;
             
+            // 1. 場地費分攤
             const courtShare = session.bookingFee / session.attendees.length;
             
+            // 🛠️ 修正 1：羽毛球費改為由當天所有出席人數共同均分（不再排除內部員工）
             let shuttleShare = 0;
-            if (session.useShuttle && !memberConfig.isEmployee) {
-                const payingCount = session.attendees.filter(n => globalData.members[n] && !globalData.members[n].isEmployee).length;
-                shuttleShare = payingCount > 0 ? (shuttleFeePerSession / payingCount) : 0;
+            if (session.useShuttle) {
+                shuttleShare = session.attendees.length > 0 ? (shuttleFeePerSession / session.attendees.length) : 0;
             }
             
+            // 🛠️ 修正 2：如果該隊員是 Guest，則加上客席人頭費
             let guessShare = 0;
             if (session.guessFee > 0 && memberConfig.isGuest) {
                 guessShare = session.guessFee;
@@ -280,24 +278,19 @@ function renderBill() {
             `;
             
             if (session.useShuttle) {
-                if (memberConfig.isEmployee) {
-                    html += `<div class="row-detail" style="color:#aaa;"><span>• 羽毛球費 <span style="color:#e67e22;">(⭐內部員工豁免)</span></span><span>$0.00</span></div>`;
-                } else {
-                    const payingCount = session.attendees.filter(n => globalData.members[n] && !globalData.members[n].isEmployee).length;
-                    html += `
-                        <div class="row-detail">
-                            <span>• 羽毛球分攤</span>
-                            <span>$${shuttleShare.toFixed(2)}</span>
-                        </div>
-                        <div class="row-detail sub">($${shuttleFeePerSession.toFixed(2)} ÷ 當日 ${payingCount} 位付費者)</div>
-                    `;
-                }
+                html += `
+                    <div class="row-detail">
+                        <span>• 羽毛球分攤</span>
+                        <span>$${shuttleShare.toFixed(2)}</span>
+                    </div>
+                    <div class="row-detail sub">($${shuttleFeePerSession.toFixed(2)} ÷ 當日 ${session.attendees.length} 人)</div>
+                `;
             }
             
             if (guessShare > 0) {
                 html += `
                     <div class="row-detail" style="color:#e74c3c; font-weight:500;">
-                        <span>• 客串附加費 (Guess Fee)</span>
+                        <span>• 客席人頭費</span>
                         <span>$${guessShare.toFixed(2)}</span>
                     </div>
                 `;
