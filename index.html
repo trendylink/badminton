@@ -95,7 +95,7 @@
                     使用 PayMe 付款 (自動開啟 App)
                 </button>
                 
-                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG'">
+                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='alipays://platformapi/startapp?appId=20000067&url=https%3A%2F%2Fqr.alipay.hk%2F281004010496IPnb5AYmN49jpe8Zkbb48dyG'">
                     使用 Alipay 付款 (自動開啟 App)
                 </button>
             </div>
@@ -104,7 +104,8 @@
 </div>
 
 <script>
-const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuELhKEl3yeHBB1zp6DdRC12Ysl7hKCFejj1Pz3tV-qTIaDmbrJGMxS0cZ07jAHnJHyPyMpKFeg/pubhtml';
+// 💡 直接指向你截圖中的 Google 試算表真實 ID，完全繞過 Web 發佈限制
+const SPREADSHEET_ID = '1ShZbbdNjugrcz-_le4VK6h7niCpwlZqaamR865HwKH0';
 
 let globalData = {
     sessions: [],
@@ -133,12 +134,18 @@ function csvToArray(text) {
 
 async function initApp() {
     try {
-        const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
+        const baseUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
         
-        // 1. 讀取 Settings 分頁
-        const settingsUrl = `${csvBaseUrl}&gid=1748286950`;
+        // 1. 讀取 Settings 分頁 (gid=2024390252)
+        const settingsUrl = `${baseUrl}&gid=2024390252`;
         const resSettings = await fetch(settingsUrl);
         const textSettings = await resSettings.text();
+        
+        // 安全檢查：防止讀取到 Google 錯誤 HTML 頁面
+        if (textSettings.trim().startsWith('<!DOCTYPE') || textSettings.includes('script')) {
+            throw new Error("未能獲取正確的 CSV 數據，請確認試算表已開啟「知道連結的任何人都可以檢視」權限。");
+        }
+        
         const arrSettings = csvToArray(textSettings);
         
         arrSettings.forEach((row, index) => {
@@ -155,8 +162,8 @@ async function initApp() {
             }
         });
 
-        // 2. 讀取 Sessions 分頁
-        const sessionsUrl = `${csvBaseUrl}&gid=0`;
+        // 2. 讀取 Sessions 分頁 (gid=0)
+        const sessionsUrl = `${baseUrl}&gid=0`;
         const resSessions = await fetch(sessionsUrl);
         const textSessions = await resSessions.text();
         const arrSessions = csvToArray(textSessions);
@@ -191,7 +198,7 @@ async function initApp() {
         renderBill();
 
     } catch (error) {
-        document.getElementById('loading').innerHTML = `❌ 數據穿透失敗！請檢查 Google 試算表是否已點選「發佈到網路」。<br>錯誤詳情: ${error}`;
+        document.getElementById('loading').innerHTML = `❌ 數據對接失敗！<br>原因：${error.message}<br><br><span style="font-size:13px;color:#999;">💡 解決辦法：請在 Google 試算表右上角點選「共用」，將權限更改為「知道連結的任何人都可以檢視」即可通電！</span>`;
     }
 }
 
@@ -211,40 +218,29 @@ function initSelectors() {
         let opt = document.createElement('option');
         opt.value = name;
         opt.innerHTML = name;
-        // 為了方便測試，如果有名單上有 Alex 則預設選取，若無則依原本預設 Wilson
-        if(name === "Alex") {
-            opt.selected = true;
-        } else if (name === "Wilson" && !Object.keys(globalData.members).includes("Alex")) {
-            opt.selected = true;
-        }
+        // 預設選擇 Wilson 
+        if(name === "Wilson") opt.selected = true;
         memberSelect.appendChild(opt);
     });
 }
 
 function renderBill() {
-    const selectedMonth = document.getElementById('monthSelect').value; // 取得 "Jun-2026" 或者是 "2026-06"
+    const selectedMonth = document.getElementById('monthSelect').value; // 取得 "Jun-2026"
     const currentName = document.getElementById('memberSelect').value;
     const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
     
     if(!selectedMonth || !currentName) return;
 
-    // 💡 智慧型跨格式日期關鍵字提取機制
+    // 將 "Jun-2026" 轉換為 "Jun-26" 格式以匹配場次表中的 "6-Jun-26"
     let dateKeywordShort = selectedMonth; 
     if (selectedMonth.includes('-')) {
         const parts = selectedMonth.split('-');
-        // 如果傳進來的是 "Jun-2026" 格式
         if (isNaN(parts[0])) { 
-            dateKeywordShort = `${parts[0]}-${parts[1].substring(2)}`; // 縮短為 "Jun-26" 完美匹配試算表的 "6-Jun-26"
-        } else {
-            // 如果傳進來的是 "2026-06" 格式
-            const monthMap = { "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec" };
-            dateKeywordShort = `${monthMap[parts[1]]}-${parts[0].substring(2)}`; // 轉換成 "Jun-26"
+            dateKeywordShort = `${parts[0]}-${parts[1].substring(2)}`; 
         }
     }
 
     const totalShuttleFee = globalData.monthlyShuttle[selectedMonth] || 0;
-    
-    // 用不分大小寫的「包含關係」來做模糊匹配，完美支援各種寫法
     const monthlySessions = globalData.sessions.filter(s => 
         s.date.toLowerCase().includes(dateKeywordShort.toLowerCase())
     );
