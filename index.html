@@ -12,8 +12,10 @@
         
         /* Header */
         .header { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; padding: 24px 16px; text-align: center; }
-        .header h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+        .header h1 { font-size: 22px; font-weight: 600; margin-bottom: 2px; }
         .header p { font-size: 13px; opacity: 0.9; }
+        /* 🌟 新增的月尾計算備註樣式 */
+        .header .remark { font-size: 12px; color: #ffeaa7; font-weight: bold; margin-top: 4px; letter-spacing: 0.5px; }
         
         /* 篩選切換 */
         .selector-box { padding: 12px 16px; border-bottom: 1px solid #eee; background: #fafafa; display: flex; gap: 10px; }
@@ -34,7 +36,7 @@
         .status-badge.unpaid { background: #ff4d4d; }
         .status-badge.paid { background: #27ae60; }
 
-        /* 📋 新增的複製金額按鈕樣式 */
+        /* 📋 複製金額按鈕樣式 */
         .copy-amt-btn { background: rgba(0,0,0,0.05); color: #555; border: none; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 2px; transition: background 0.2s; }
         .copy-amt-btn:hover { background: rgba(0,0,0,0.1); }
 
@@ -63,6 +65,7 @@
     <div class="header">
         <h1>🏸 羽毛球費用查閱系統</h1>
         <p id="headerSub">請在下方選擇隊員</p>
+        <div class="remark">⚠️ *羽毛球*費於月尾計算</div>
     </div>
 
     <div class="selector-box">
@@ -144,7 +147,6 @@ function csvToArray(text) {
     return r;
 }
 
-// 🌟 新增：複製金額的觸發函式
 function copyCurrentAmount() {
     const amtText = document.getElementById('totalAmount').innerText.replace('$', '').trim();
     if(amtText && amtText !== "0.00") {
@@ -277,7 +279,7 @@ function renderBill() {
         statusBadge.innerHTML = "🔴 未付款";
         statusBadge.className = "status-badge unpaid";
         payBox.style.display = "none";
-        copyAmtBtn.style.display = "none"; // 隱藏複製按鈕
+        copyAmtBtn.style.display = "none"; 
         return;
     }
 
@@ -383,14 +385,13 @@ function renderBill() {
         statusBadge.innerHTML = "🟢 已付款";
         statusBadge.className = "status-badge paid";
         payBox.style.display = "none";
-        copyAmtBtn.style.display = "none"; // 已付款就不需要複製金額了
+        copyAmtBtn.style.display = "none"; 
     } else {
         summaryCard.classList.remove('is-paid');
         statusBadge.innerHTML = "🔴 未付款";
         statusBadge.className = "status-badge unpaid";
         payBox.style.display = "block";
         
-        // 只有在未付款且金額大於 0 時，才顯示複製金額按鈕
         if(totalNeedToPay > 0) {
             copyAmtBtn.style.display = "block";
         } else {
