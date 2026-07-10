@@ -57,7 +57,7 @@
 <div class="app-container" id="app">
     <div class="header">
         <h1>🏸 羽毛球費用查閱系統</h1>
-        <p id="headerSub">雲端自動同步版</p>
+        <p id="headerSub">請在下方選擇隊員</p>
     </div>
 
     <div class="selector-box">
@@ -87,7 +87,7 @@
 
         <div class="card-list" id="sessionList"></div>
 
-        <div class="pay-box" id="payBox" style="background: #fdfefe; border: 1px solid #e1e8ed; padding: 16px;">
+        <div class="pay-box" id="payBox" style="background: #fdfefe; border: 1px solid #e1e8ed; padding: 16px; display: none;">
             <p style="font-size: 14px; font-weight: bold; margin-bottom: 12px; color: #444;">📲 選擇付款方式</p>
             
             <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -112,8 +112,8 @@ const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvu
 
 let globalData = {
     sessions: [],
-    monthlyShuttle: {}, // { "Jun-2026": 170.00 }
-    members: {}         // { "Wilson": { isEmployee: false, isGuest: true, isPaid: true } }
+    monthlyShuttle: {}, 
+    members: {}         
 };
 
 function csvToArray(text) {
@@ -139,17 +139,15 @@ async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
         
-        // 1. 讀取 Settings 工作表 (gid=2024390252)
         const resSettings = await fetch(`${csvBaseUrl}&gid=2024390252`);
         const textSettings = await resSettings.text();
         const arrSettings = csvToArray(textSettings);
         
-        let lastSeenMonth = ""; // 用於自動遞補留白的月份
+        let lastSeenMonth = ""; 
         
         arrSettings.forEach((row, index) => {
-            if (index === 0) return; // 跳過第一行標題
+            if (index === 0) return; 
             
-            // 安全清洗與獲取每一欄的值
             let mCol = row[0] ? row[0].trim() : "";
             let feeCol = row[1] ? row[1].trim() : "";
             let nameCol = row[3] ? row[3].trim() : "";
@@ -157,13 +155,11 @@ async function initApp() {
             let gstCol = row[5] ? row[5].trim().toUpperCase() : "";
             let paidCol = row[6] ? row[6].trim().toUpperCase() : "";
             
-            // 邏輯 1：解算月球總費（記住有填寫的那一行）
             if (mCol !== "" && !mCol.includes("function") && !mCol.includes("Object")) {
                 lastSeenMonth = mCol;
                 globalData.monthlyShuttle[lastSeenMonth] = parseFloat(feeCol) || 0;
             }
             
-            // 邏輯 2：解算隊員名單
             if (nameCol !== "" && !nameCol.includes("function") && !nameCol.includes("Object")) {
                 globalData.members[nameCol] = {
                     isEmployee: empCol === 'TRUE',
@@ -173,7 +169,6 @@ async function initApp() {
             }
         });
 
-        // 2. 讀取 Sessions 工作表 (gid=0)
         const resSessions = await fetch(`${csvBaseUrl}&gid=0`);
         const textSessions = await resSessions.text();
         const arrSessions = csvToArray(textSessions);
@@ -192,7 +187,6 @@ async function initApp() {
                 attendees: []
             };
             
-            // 讀取打勾 '1' 的出席人員
             for(let j=4; j<headers.length; j++) {
                 if(row[j] && row[j].trim() === '1' && headers[j] && !headers[j].includes("function")) {
                     session.attendees.push(headers[j]);
@@ -201,13 +195,12 @@ async function initApp() {
             globalData.sessions.push(session);
         }
 
-        // 初始化下拉選單
         initSelectors();
         
         document.getElementById('loading').style.display = 'none';
         document.getElementById('app').style.display = 'block';
         
-        renderBill();
+        renderBill(); // 初始呼叫，會顯示空白預設畫面
 
     } catch (error) {
         document.getElementById('loading').innerHTML = `❌ 數據解析失敗，請確保試算表已發佈！<br>錯誤詳情: ${error}`;
@@ -217,6 +210,13 @@ async function initApp() {
 function initSelectors() {
     const monthSelect = document.getElementById('monthSelect');
     monthSelect.innerHTML = "";
+    
+    // 🌟 月份加入 "-" 預設空選項
+    let mBlank = document.createElement('option');
+    mBlank.value = "-";
+    mBlank.innerHTML = "-";
+    monthSelect.appendChild(mBlank);
+    
     Object.keys(globalData.monthlyShuttle).forEach(m => {
         let opt = document.createElement('option');
         opt.value = m;
@@ -226,11 +226,17 @@ function initSelectors() {
 
     const memberSelect = document.getElementById('memberSelect');
     memberSelect.innerHTML = "";
+    
+    // 🌟 隊員加入 "-" 預設空選項，不自動選擇 Wilson
+    let memBlank = document.createElement('option');
+    memBlank.value = "-";
+    memBlank.innerHTML = "-";
+    memberSelect.appendChild(memBlank);
+    
     Object.keys(globalData.members).forEach(name => {
         let opt = document.createElement('option');
         opt.value = name;
         opt.innerHTML = name;
-        if(name === "Wilson") opt.selected = true;
         memberSelect.appendChild(opt);
     });
 }
@@ -238,9 +244,26 @@ function initSelectors() {
 function renderBill() {
     const selectedMonth = document.getElementById('monthSelect').value; 
     const currentName = document.getElementById('memberSelect').value;
-    const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false, isPaid: false };
     
-    if(!selectedMonth || !currentName) return;
+    const summaryCard = document.getElementById('summaryCard');
+    const statusBadge = document.getElementById('statusBadge');
+    const payBox = document.getElementById('payBox');
+    
+    // 🌟 如果使用者選擇的是 "-"，直接將介面清空為初始狀態，不顯示任何計算
+    if (selectedMonth === "-" || currentName === "-") {
+        document.getElementById('totalAmount').innerHTML = "$0.00";
+        document.getElementById('attendanceCount').innerHTML = "";
+        document.getElementById('sessionList').innerHTML = `<div style="text-align:center;color:#999;padding:40px;">請選擇月份及隊員名稱以查閱明細</div>`;
+        document.getElementById('headerSub').innerHTML = "請選擇月份與隊員";
+        
+        summaryCard.classList.remove('is-paid');
+        statusBadge.innerHTML = "🔴 未付款";
+        statusBadge.className = "status-badge unpaid";
+        payBox.style.display = "none";
+        return;
+    }
+
+    const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false, isPaid: false };
 
     let dateKeywordShort = selectedMonth; 
     if (selectedMonth.includes('-')) {
@@ -329,11 +352,6 @@ function renderBill() {
     document.getElementById('attendanceCount').innerHTML = `本月出席 ${totalSessionsAttended} 場`;
     document.getElementById('sessionList').innerHTML = html || `<div style="text-align:center;color:#999;padding:40px;">本月此隊員無出席記錄</div>`;
     
-    // 控制 已付款/未付款 UI 面板狀態與顯示
-    const summaryCard = document.getElementById('summaryCard');
-    const statusBadge = document.getElementById('statusBadge');
-    const payBox = document.getElementById('payBox');
-
     if (memberConfig.isPaid) {
         summaryCard.classList.add('is-paid');
         statusBadge.innerHTML = "🟢 已付款";
