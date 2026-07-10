@@ -43,7 +43,7 @@
 
         /* 付款按鈕 */
         .pay-box { background: #eef9ff; border: 1px solid #cfe9ff; border-radius: 12px; padding: 14px; margin-top: 20px; text-align: center; font-size: 13px; }
-        .pay-btn { background: #11998e; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 8px; font-size: 14px; cursor: pointer; }
+        .pay-btn { background: #11998e; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 8px; font-size: 14px; cursor: pointer; display: block; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -95,15 +95,16 @@
                     使用 PayMe 付款 (自動開啟 App)
                 </button>
                 
-                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG'">
+                <a class="pay-btn" style="background: #00a4e4; margin: 0; text-align: center;" href="https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG" target="_blank">
                     使用 Alipay 付款 (自動開啟 App)
-                </button>
+                </a>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+// 使用你提供給我的正式 Google 網路發佈網址
 const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuELhKEl3yeHBB1zp6DdRC12Ysl7hKCFejj1Pz3tV-qTIaDmbrJGMxS0cZ07jAHnJHyPyMpKFeg/pubhtml';
 
 let globalData = {
@@ -135,15 +136,16 @@ async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
         
-        const settingsUrl = `${csvBaseUrl}&gid=1748286950`;
+        // 🛠️ 修正 1：更換為你試算表中真實的 Settings 分頁 gid (2024390252)
+        const settingsUrl = `${csvBaseUrl}&gid=2024390252`;
         const resSettings = await fetch(settingsUrl);
         const textSettings = await resSettings.text();
         const arrSettings = csvToArray(textSettings);
         
         arrSettings.forEach((row, index) => {
             if (index === 0) return;
-            if (row[0] && row[1]) {
-                globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]);
+            if (row[0] && row[0].trim() !== "") {
+                globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]) || 0;
             }
             if (row[3]) {
                 const name = row[3].trim();
@@ -154,6 +156,7 @@ async function initApp() {
             }
         });
 
+        // 讀取 Sessions 分頁 (gid=0)
         const sessionsUrl = `${csvBaseUrl}&gid=0`;
         const resSessions = await fetch(sessionsUrl);
         const textSessions = await resSessions.text();
@@ -163,7 +166,7 @@ async function initApp() {
         
         for(let i=1; i<arrSessions.length; i++) {
             const row = arrSessions[i];
-            if(!row[0]) continue;
+            if(!row[0] || row[0].trim() === "") continue;
             
             let session = {
                 date: row[0].trim(),
@@ -189,12 +192,13 @@ async function initApp() {
         renderBill();
 
     } catch (error) {
-        document.getElementById('loading').innerHTML = `❌ 數據穿透失敗！請檢查 Google 試算表是否已點選「發佈到網路」。<br>錯誤詳情: ${error}`;
+        document.getElementById('loading').innerHTML = `❌ 數據穿透失敗！請確保試算表已「發佈到網路」。<br>錯誤詳情: ${error}`;
     }
 }
 
 function initSelectors() {
     const monthSelect = document.getElementById('monthSelect');
+    monthSelect.innerHTML = "";
     Object.keys(globalData.monthlyShuttle).forEach(m => {
         let opt = document.createElement('option');
         opt.value = m;
@@ -203,6 +207,7 @@ function initSelectors() {
     });
 
     const memberSelect = document.getElementById('memberSelect');
+    memberSelect.innerHTML = "";
     Object.keys(globalData.members).forEach(name => {
         let opt = document.createElement('option');
         opt.value = name;
@@ -213,17 +218,25 @@ function initSelectors() {
 }
 
 function renderBill() {
-    const selectedMonth = document.getElementById('monthSelect').value;
+    const selectedMonth = document.getElementById('monthSelect').value; // 取得 "Jun-2026"
     const currentName = document.getElementById('memberSelect').value;
     const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
     
-    const monthMap = { "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec" };
-    const mPart = selectedMonth.split('-')[1];
-    const yPart = selectedMonth.split('-')[0].substring(2);
-    const dateKeyword = `${monthMap[mPart]}-${yPart}`;
+    if(!selectedMonth || !currentName) return;
+
+    // 🛠️ 修正 2：優化日期關鍵字匹配邏輯。直接將 "Jun-2026" 轉換成簡寫 "Jun-26" 去比對場次表
+    let dateKeywordShort = selectedMonth; 
+    if (selectedMonth.includes('-')) {
+        const parts = selectedMonth.split('-'); // ["Jun", "2026"]
+        if (parts.length === 2 && isNaN(parts[0])) { 
+            dateKeywordShort = `${parts[0]}-${parts[1].substring(2)}`; // 生成 "Jun-26"
+        }
+    }
 
     const totalShuttleFee = globalData.monthlyShuttle[selectedMonth] || 0;
-    const monthlySessions = globalData.sessions.filter(s => s.date.includes(dateKeyword));
+    const monthlySessions = globalData.sessions.filter(s => 
+        s.date.toLowerCase().includes(dateKeywordShort.toLowerCase())
+    );
     
     const shuttleSessionsCount = monthlySessions.filter(s => s.useShuttle).length;
     const shuttleFeePerSession = shuttleSessionsCount > 0 ? (totalShuttleFee / shuttleSessionsCount) : 0;
