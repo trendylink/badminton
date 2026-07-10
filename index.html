@@ -87,16 +87,18 @@
             <p style="font-size: 14px; font-weight: bold; margin-bottom: 12px; color: #444;">📲 選擇付款方式</p>
             
             <div style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- 1. FPS 按鈕 -->
                 <button class="pay-btn" style="background: #ff4d4d; margin: 0;" onclick="navigator.clipboard.writeText('61866188'); alert('📋 已成功複製轉賬號碼：61866188！\n方便你隨時開啟銀行 App 進行轉賬。')">
                     轉賬至 FPS (一鍵複製號碼)
                 </button>
                 
-                <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="window.location.href='https://payme.hsbc/
-https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3>
+                <!-- 2. PayMe 按鈕 (已修正網址與引號) -->
+                <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="window.location.href='https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3'">
                     使用 PayMe 付款 (自動開啟 App)
                 </button>
                 
-                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='https://qr.alipay.hk/https://render.alipay.com/p/yuyan/180020010001270667/landing/income.html?qrcode=https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG>
+                <!-- 3. Alipay 按鈕 (已修正網址與引號) -->
+                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="window.location.href='https://render.alipay.com/p/yuyan/180020010001270667/landing/income.html?qrcode=https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG'">
                     使用 Alipay 付款 (自動開啟 App)
                 </button>
             </div>
