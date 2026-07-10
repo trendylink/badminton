@@ -169,7 +169,7 @@ async function initApp() {
                 date: row[0].trim(),
                 bookingFee: parseFloat(row[1]) || 0,
                 useShuttle: row[2] ? row[2].trim().toUpperCase() === 'TRUE' : false,
-                guessFee: parseFloat(row[3]) || 0,
+                guessFee: parseFloat(row[3]) || 0, // We read column D layout, but dynamic calculations will handle the logic
                 attendees: []
             };
             
@@ -254,12 +254,11 @@ function renderBill() {
                 shuttleShare = shuttleFeePerSession / session.attendees.length;
             }
             
-            // 3. Guess Fee logic ($10/pax for the session's total guests) applied to current selected member if they are a guest
+            // 3. New Fixed Guess Fee Calculation logic:
+            // If currently viewed person is a Guest, they pay flat $10.00. Employees/Members pay $0.
             let guessShare = 0;
             if (memberConfig.isGuest) {
-                // Count how many of today's attendees are flagged as Guest
-                const todayGuestsCount = session.attendees.filter(name => globalData.members[name] && globalData.members[name].isGuest).length;
-                guessShare = todayGuestsCount * 10;
+                guessShare = 10.00;
             }
             
             const sessionTotal = courtShare + shuttleShare + guessShare;
@@ -290,10 +289,9 @@ function renderBill() {
             }
             
             if (guessShare > 0) {
-                const todayGuestsCount = session.attendees.filter(name => globalData.members[name] && globalData.members[name].isGuest).length;
                 html += `
                     <div class="row-detail" style="color:#e74c3c; font-weight:500;">
-                        <span>• Guess Fee ($10.00 × ${todayGuestsCount}名客席)</span>
+                        <span>• Guess Fee</span>
                         <span>$${guessShare.toFixed(2)}</span>
                     </div>
                 `;
