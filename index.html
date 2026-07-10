@@ -135,6 +135,7 @@ async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
         
+        // 1. 讀取 Settings 分頁
         const settingsUrl = `${csvBaseUrl}&gid=1748286950`;
         const resSettings = await fetch(settingsUrl);
         const textSettings = await resSettings.text();
@@ -143,7 +144,7 @@ async function initApp() {
         arrSettings.forEach((row, index) => {
             if (index === 0) return;
             if (row[0] && row[1]) {
-                globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]);
+                globalData.monthlyShuttle[row[0].trim()] = parseFloat(row[1]) || 0;
             }
             if (row[3]) {
                 const name = row[3].trim();
@@ -154,6 +155,7 @@ async function initApp() {
             }
         });
 
+        // 2. 讀取 Sessions 分頁
         const sessionsUrl = `${csvBaseUrl}&gid=0`;
         const resSessions = await fetch(sessionsUrl);
         const textSessions = await resSessions.text();
@@ -163,7 +165,7 @@ async function initApp() {
         
         for(let i=1; i<arrSessions.length; i++) {
             const row = arrSessions[i];
-            if(!row[0]) continue;
+            if(!row[0] || row[0].trim() === "") continue;
             
             let session = {
                 date: row[0].trim(),
@@ -195,6 +197,7 @@ async function initApp() {
 
 function initSelectors() {
     const monthSelect = document.getElementById('monthSelect');
+    monthSelect.innerHTML = "";
     Object.keys(globalData.monthlyShuttle).forEach(m => {
         let opt = document.createElement('option');
         opt.value = m;
@@ -203,27 +206,48 @@ function initSelectors() {
     });
 
     const memberSelect = document.getElementById('memberSelect');
+    memberSelect.innerHTML = "";
     Object.keys(globalData.members).forEach(name => {
         let opt = document.createElement('option');
         opt.value = name;
         opt.innerHTML = name;
-        if(name === "Wilson") opt.selected = true;
+        // 為了方便測試，如果有名單上有 Alex 則預設選取，若無則依原本預設 Wilson
+        if(name === "Alex") {
+            opt.selected = true;
+        } else if (name === "Wilson" && !Object.keys(globalData.members).includes("Alex")) {
+            opt.selected = true;
+        }
         memberSelect.appendChild(opt);
     });
 }
 
 function renderBill() {
-    const selectedMonth = document.getElementById('monthSelect').value;
+    const selectedMonth = document.getElementById('monthSelect').value; // 取得 "Jun-2026" 或者是 "2026-06"
     const currentName = document.getElementById('memberSelect').value;
     const memberConfig = globalData.members[currentName] || { isEmployee: false, isGuest: false };
     
-    const monthMap = { "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec" };
-    const mPart = selectedMonth.split('-')[1];
-    const yPart = selectedMonth.split('-')[0].substring(2);
-    const dateKeyword = `${monthMap[mPart]}-${yPart}`;
+    if(!selectedMonth || !currentName) return;
+
+    // 💡 智慧型跨格式日期關鍵字提取機制
+    let dateKeywordShort = selectedMonth; 
+    if (selectedMonth.includes('-')) {
+        const parts = selectedMonth.split('-');
+        // 如果傳進來的是 "Jun-2026" 格式
+        if (isNaN(parts[0])) { 
+            dateKeywordShort = `${parts[0]}-${parts[1].substring(2)}`; // 縮短為 "Jun-26" 完美匹配試算表的 "6-Jun-26"
+        } else {
+            // 如果傳進來的是 "2026-06" 格式
+            const monthMap = { "01":"Jan", "02":"Feb", "03":"Mar", "04":"Apr", "05":"May", "06":"Jun", "07":"Jul", "08":"Aug", "09":"Sep", "10":"Oct", "11":"Nov", "12":"Dec" };
+            dateKeywordShort = `${monthMap[parts[1]]}-${parts[0].substring(2)}`; // 轉換成 "Jun-26"
+        }
+    }
 
     const totalShuttleFee = globalData.monthlyShuttle[selectedMonth] || 0;
-    const monthlySessions = globalData.sessions.filter(s => s.date.includes(dateKeyword));
+    
+    // 用不分大小寫的「包含關係」來做模糊匹配，完美支援各種寫法
+    const monthlySessions = globalData.sessions.filter(s => 
+        s.date.toLowerCase().includes(dateKeywordShort.toLowerCase())
+    );
     
     const shuttleSessionsCount = monthlySessions.filter(s => s.useShuttle).length;
     const shuttleFeePerSession = shuttleSessionsCount > 0 ? (totalShuttleFee / shuttleSessionsCount) : 0;
