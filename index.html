@@ -245,19 +245,21 @@ function renderBill() {
         if (session.attendees.includes(currentName)) {
             totalSessionsAttended++;
             
-            // 1. 場地費分攤
+            // 1. Court Fee split among everyone present
             const courtShare = session.bookingFee / session.attendees.length;
             
-            // 🛠️ 修正 1：羽毛球費改為由當天所有出席人數共同均分（不再排除內部員工）
+            // 2. Shuttle Fee split accurately among ALL attendees present
             let shuttleShare = 0;
-            if (session.useShuttle) {
-                shuttleShare = session.attendees.length > 0 ? (shuttleFeePerSession / session.attendees.length) : 0;
+            if (session.useShuttle && session.attendees.length > 0) {
+                shuttleShare = shuttleFeePerSession / session.attendees.length;
             }
             
-            // 🛠️ 修正 2：如果該隊員是 Guest，則加上客席人頭費
+            // 3. Guess Fee logic ($10/pax for the session's total guests) applied to current selected member if they are a guest
             let guessShare = 0;
-            if (session.guessFee > 0 && memberConfig.isGuest) {
-                guessShare = session.guessFee;
+            if (memberConfig.isGuest) {
+                // Count how many of today's attendees are flagged as Guest
+                const todayGuestsCount = session.attendees.filter(name => globalData.members[name] && globalData.members[name].isGuest).length;
+                guessShare = todayGuestsCount * 10;
             }
             
             const sessionTotal = courtShare + shuttleShare + guessShare;
@@ -288,9 +290,10 @@ function renderBill() {
             }
             
             if (guessShare > 0) {
+                const todayGuestsCount = session.attendees.filter(name => globalData.members[name] && globalData.members[name].isGuest).length;
                 html += `
                     <div class="row-detail" style="color:#e74c3c; font-weight:500;">
-                        <span>• 客席人頭費</span>
+                        <span>• Guess Fee ($10.00 × ${todayGuestsCount}名客席)</span>
                         <span>$${guessShare.toFixed(2)}</span>
                     </div>
                 `;
