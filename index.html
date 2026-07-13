@@ -99,19 +99,15 @@
 </div>
 
 <script>
-// 請確保此處連結與您的 Google Sheet 發佈連結一致
 const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuELhKEl3yeHBB1zp6DdRC12Ysl7hKCFejj1Pz3tV-qTIaDmbrJGMxS0cZ07jAHnJHyPyMpKFeg/pubhtml';
 
-// 確保 renderBill 函數中包含以下邏輯以顯示獨立區塊：
-// if (!isPaid) {
-//     document.getElementById('payBox').style.display = 'block';
-//     document.getElementById('whatsappBox').style.display = 'block';
-// } else {
-//     document.getElementById('payBox').style.display = 'none';
-//     document.getElementById('whatsappBox').style.display = 'none';
-// }
+// 在 renderBill() 函數的 else 區塊中，請確保加入以下控制顯示的程式碼：
+// document.getElementById('payBox').style.display = 'block';
+// document.getElementById('whatsappBox').style.display = 'block';
 
-// 保持原本的 fetch 和渲染邏輯即可運作
+// 並在 isPaid 為 true 的判斷中加入：
+// document.getElementById('payBox').style.display = 'none';
+// document.getElementById('whatsappBox').style.display = 'none';
 </script>
 </body>
 </html>
