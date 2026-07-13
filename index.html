@@ -14,7 +14,6 @@
         .header { background: linear-gradient(135deg, #11998e, #38ef7d); color: white; padding: 24px 16px; text-align: center; }
         .header h1 { font-size: 22px; font-weight: 600; margin-bottom: 2px; }
         .header p { font-size: 13px; opacity: 0.9; }
-        /* 🌟 新增的月尾計算備註樣式 */
         .header .remark { font-size: 12px; color: #ffeaa7; font-weight: bold; margin-top: 4px; letter-spacing: 0.5px; }
         
         /* 篩選切換 */
@@ -113,6 +112,10 @@
                 <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="const amt = document.getElementById('totalAmount').innerText.replace('$',''); navigator.clipboard.writeText(amt); alert('📋 已為你自動複製應付金額：$' + amt + ' ！\n即將開啟 Alipay，進入後直接貼上金額即可。'); window.open('https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG', '_blank')">
                     使用 Alipay 付款 (自動複製金額)
                 </button>
+
+                <button class="pay-btn" style="background: #25D366; margin: 0;" onclick="sendWhatsAppNotification()">
+                    WhatsApp 收款人 (已付複製金額)
+                </button>
             </div>
         </div>
     </div>
@@ -152,6 +155,17 @@ function copyCurrentAmount() {
     if(amtText && amtText !== "0.00") {
         navigator.clipboard.writeText(amtText);
         alert(`📋 已成功複製應付金額：$${amtText}`);
+    }
+}
+
+// 🟢 自動帶入電話 85261866188 與「已付$XX.00」訊息
+function sendWhatsAppNotification() {
+    const amtText = document.getElementById('totalAmount').innerText.replace('$', '').trim();
+    if(amtText && amtText !== "0.00") {
+        const message = `已付$${amtText}`;
+        // 帶有 852 國碼的收款號碼，會直接開啟與該號碼的私訊對話
+        const whatsappUrl = `https://api.whatsapp.com/send?phone=85261866188&text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
     }
 }
 
