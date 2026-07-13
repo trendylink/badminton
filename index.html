@@ -112,12 +112,16 @@
                 <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="const amt = document.getElementById('totalAmount').innerText.replace('$',''); navigator.clipboard.writeText(amt); alert('📋 已為你自動複製應付金額：$' + amt + ' ！\n即將開啟 Alipay，進入後直接貼上金額即可。'); window.open('https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG', '_blank')">
                     使用 Alipay 付款 (自動複製金額)
                 </button>
-
-                <button class="pay-btn" style="background: #25D366; margin: 0;" onclick="sendWhatsAppNotification()">
-                    WhatsApp 收款人 (已付複製金額)
-                </button>
             </div>
         </div>
+
+            <div id="whatsappBox" style="background: #f4fbf7; border: 1px solid #d1f2e1; border-radius: 12px; padding: 16px; margin-top: 14px; text-align: center; display: none;">
+            <p style="font-size: 13px; font-weight: 500; margin-bottom: 8px; color: #27ae60;">👍 付款後請通知收款人確認</p>
+                <button class="pay-btn" style="background: #25D366; margin: 0;" onclick="sendWhatsAppNotification()">
+                💬 WhatsApp 通知收款人 (自動帶入已付金額)
+            </button>
+        </div>
+
     </div>
 </div>
 
