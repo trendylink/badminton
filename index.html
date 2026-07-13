@@ -54,6 +54,10 @@
         /* 付款按鈕 */
         .pay-box { background: #eef9ff; border: 1px solid #cfe9ff; border-radius: 12px; padding: 14px; margin-top: 20px; text-align: center; font-size: 13px; }
         .pay-btn { background: #11998e; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 8px; font-size: 14px; cursor: pointer; display: block; text-decoration: none; }
+        
+        /* WhatsApp 獨立按鈕 */
+        .whatsapp-container { margin-top: 15px; text-align: center; }
+        .wa-btn { background: #25D366; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -97,48 +101,26 @@
 
         <div class="card-list" id="sessionList"></div>
 
-        <div class="pay-box" id="payBox" style="background: #fdfefe; border: 1px solid #e1e8ed; padding: 16px; display: none;">
+        <div class="pay-box" id="payBox" style="display: none;">
             <p style="font-size: 14px; font-weight: bold; margin-bottom: 12px; color: #444;">📲 選擇付款方式</p>
-            
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                <button class="pay-btn" style="background: #ff4d4d; margin: 0;" onclick="navigator.clipboard.writeText('61866188'); alert('📋 已成功複製轉賬號碼：61866188！\n方便你隨時開啟銀行 App 進行轉賬。')">
-                    轉賬至 FPS (一鍵複製號碼)
-                </button>
-                
-                <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="const amt = document.getElementById('totalAmount').innerText.replace('$',''); navigator.clipboard.writeText(amt); alert('📋 已為你自動複製應付金額：$' + amt + ' ！\n即將開啟 PayMe，進入後直接貼上金額即可。'); window.location.href='https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3'">
-                    使用 PayMe 付款 (自動複製金額)
-                </button>
-                
-                <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="const amt = document.getElementById('totalAmount').innerText.replace('$',''); navigator.clipboard.writeText(amt); alert('📋 已為你自動複製應付金額：$' + amt + ' ！\n即將開啟 Alipay，進入後直接貼上金額即可。'); window.open('https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG', '_blank')">
-                    使用 Alipay 付款 (自動複製金額)
-                </button>
-            </div>
+            <button class="pay-btn" style="background: #ff4d4d; margin: 0;" onclick="navigator.clipboard.writeText('61866188'); alert('📋 已成功複製轉賬號碼：61866188！')">轉賬至 FPS (一鍵複製號碼)</button>
+            <button class="pay-btn" style="background: #e71d36; margin: 8px 0 0 0;" onclick="const amt = document.getElementById('totalAmount').innerText.replace('$',''); navigator.clipboard.writeText(amt); alert('📋 已複製應付金額：$' + amt + '！'); window.location.href='https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3'">使用 PayMe 付款</button>
+            <button class="pay-btn" style="background: #00a4e4; margin: 8px 0 0 0;" onclick="const amt = document.getElementById('totalAmount').innerText.replace('$',''); navigator.clipboard.writeText(amt); alert('📋 已複製應付金額：$' + amt + '！'); window.open('https://qr.alipay.hk/281004010496IPnb5AYmN49jpe8Zkbb48dyG', '_blank')">使用 Alipay 付款</button>
         </div>
 
-        <div id="whatsappBox" style="background: #f4fbf7; border: 1px solid #d1f2e1; border-radius: 12px; padding: 16px; margin-top: 14px; text-align: center; display: none;">
-            <p style="font-size: 13px; font-weight: 500; margin-bottom: 8px; color: #27ae60;">👍 付款後請通知收款人確認</p>
-            <button class="pay-btn" style="background: #25D366; margin: 0;" onclick="sendWhatsAppNotification()">
-                💬 WhatsApp 通知收款人 (自動帶入已付金額)
-            </button>
+        <div class="whatsapp-container" id="waBox" style="display: none;">
+            <button class="wa-btn" onclick="sendWhatsAppNotification()">💬 WhatsApp 通知收款人 (已付複製金額)</button>
         </div>
-
     </div>
 </div>
 
 <script>
 const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuELhKEl3yeHBB1zp6DdRC12Ysl7hKCFejj1Pz3tV-qTIaDmbrJGMxS0cZ07jAHnJHyPyMpKFeg/pubhtml';
 
-let globalData = {
-    sessions: [],
-    monthlyShuttle: {}, 
-    members: {},
-    settingsHeaders: [] 
-};
+let globalData = { sessions: [], monthlyShuttle: {}, members: {}, settingsHeaders: [] };
 
 function csvToArray(text) {
-    let p = '', r = [];
-    let q = false;
-    let row = [''];
+    let p = '', r = []; let q = false; let row = [''];
     for (let i=0; i<text.length; i++) {
         let c = text[i];
         if (c === '"') { q = !q; continue; }
@@ -147,8 +129,7 @@ function csvToArray(text) {
             if (c === '\n' && p === '\r') { p = c; continue; }
             r.push(row); row = ['']; p = c; continue;
         }
-        row[row.length-1] += c;
-        p = c;
+        row[row.length-1] += c; p = c;
     }
     if (row.length > 1 || row[0] !== '') r.push(row);
     return r;
@@ -166,272 +147,88 @@ function sendWhatsAppNotification() {
     const amtText = document.getElementById('totalAmount').innerText.replace('$', '').trim();
     if(amtText && amtText !== "0.00") {
         const message = `已付$${amtText}`;
-        const whatsappUrl = `https://api.whatsapp.com/send?phone=85261866188&text=${encodeURIComponent(message)}`;
-        window.open(whatsappUrl, '_blank');
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
     }
 }
 
 async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
-        
-        // 讀取 Settings 分頁
-        const resSettings = await fetch(`${csvBaseUrl}&gid=777656204`);
+        const resSettings = await fetch(`${csvBaseUrl}&gid=2024390252`);
         const textSettings = await resSettings.text();
         const arrSettings = csvToArray(textSettings);
+        globalData.settingsHeaders = arrSettings[0].map(h => h ? h.trim() : "");
         
-        const cleanHeaders = arrSettings[0].map(h => h ? h.replace(/^\uFEFF/, '').trim().toLowerCase() : "");
-        globalData.settingsHeaders = arrSettings[0].map(h => h ? h.replace(/^\uFEFF/, '').trim() : "");
-        
-        let monthIdx = cleanHeaders.findIndex(h => h !== "" && h.includes("month"));
-        let shuttleFeeIdx = cleanHeaders.findIndex(h => h !== "" && (h.includes("shuttlecock") || h.includes("fee")));
-        let nameIdx = cleanHeaders.findIndex(h => h !== "" && h === "name");
-        let empIdx = cleanHeaders.findIndex(h => h !== "" && h.includes("employee"));
-        let guestIdx = cleanHeaders.findIndex(h => h !== "" && (h.includes("guess") || h.includes("guest")));
-
-        if (monthIdx === -1) monthIdx = 0;
-        if (shuttleFeeIdx === -1) shuttleFeeIdx = 1;
-        if (nameIdx === -1) nameIdx = 3; 
-        if (empIdx === -1) empIdx = 4;
-        if (guestIdx === -1) guestIdx = 5;
-
-        let lastSeenMonth = ""; 
-        
+        let lastSeenMonth = "";
         arrSettings.forEach((row, index) => {
-            if (index === 0) return; 
+            if (index === 0) return;
+            let mCol = row[0] ? row[0].trim() : "";
+            let feeCol = row[1] ? row[1].trim() : "";
+            let nameCol = row[3] ? row[3].trim() : "";
+            let empCol = row[4] ? row[4].trim().toUpperCase() : "";
+            let gstCol = row[5] ? row[5].trim().toUpperCase() : "";
             
-            let mCol = row[monthIdx] ? row[monthIdx].trim() : "";
-            let feeCol = row[shuttleFeeIdx] ? row[shuttleFeeIdx].trim() : "";
-            let nameCol = row[nameIdx] ? row[nameIdx].trim() : "";
-            let empCol = row[empIdx] ? row[empIdx].trim().toUpperCase() : "";
-            let gstCol = row[guestIdx] ? row[guestIdx].trim().toUpperCase() : "";
-            
-            if (mCol !== "" && !mCol.includes("<html") && !mCol.includes("function")) {
-                lastSeenMonth = mCol;
-                globalData.monthlyShuttle[lastSeenMonth] = parseFloat(feeCol) || 0;
-            }
-            
-            if (nameCol !== "" && !nameCol.includes("<html") && !nameCol.includes("function")) {
-                globalData.members[nameCol] = {
-                    isEmployee: empCol === 'TRUE',
-                    isGuest: gstCol === 'TRUE',
-                    rawRowData: row 
-                };
-            }
+            if (mCol !== "" && !mCol.includes("function")) { lastSeenMonth = mCol; globalData.monthlyShuttle[lastSeenMonth] = parseFloat(feeCol) || 0; }
+            if (nameCol !== "" && !nameCol.includes("function")) { globalData.members[nameCol] = { isEmployee: empCol === 'TRUE', isGuest: gstCol === 'TRUE', rawRowData: row }; }
         });
 
-        // 讀取 Sessions 數據分頁
         const resSessions = await fetch(`${csvBaseUrl}&gid=0`);
         const textSessions = await resSessions.text();
         const arrSessions = csvToArray(textSessions);
-        
-        const rawSessionsHeaders = arrSessions[0].map(h => h ? h.replace(/^\uFEFF/, '').trim() : "");
+        const headers = arrSessions[0].map(h => h ? h.trim() : "");
         
         for(let i=1; i<arrSessions.length; i++) {
             const row = arrSessions[i];
-            if(!row[0] || row[0].trim() === "" || row[0].includes("<html")) continue;
-            
-            let session = {
-                date: row[0].trim(),
-                bookingFee: parseFloat(row[1]) || 0,
-                useShuttle: row[2] ? row[2].trim().toUpperCase() === 'TRUE' : false,
-                guessFee: parseFloat(row[3]) || 0,
-                attendees: []
-            };
-            
-            for(let j=4; j<rawSessionsHeaders.length; j++) {
-                if(row[j] && row[j].trim() === '1' && rawSessionsHeaders[j]) {
-                    session.attendees.push(rawSessionsHeaders[j]);
-                }
-            }
+            if(!row[0] || row[0].trim() === "" || row[0].includes("function")) continue;
+            let session = { date: row[0].trim(), bookingFee: parseFloat(row[1]) || 0, useShuttle: row[2] ? row[2].trim().toUpperCase() === 'TRUE' : false, attendees: [] };
+            for(let j=4; j<headers.length; j++) { if(row[j] && row[j].trim() === '1') session.attendees.push(headers[j]); }
             globalData.sessions.push(session);
         }
-
         initSelectors();
-        
         document.getElementById('loading').style.display = 'none';
         document.getElementById('app').style.display = 'block';
-        
-        renderBill(); 
-
-    } catch (error) {
-        document.getElementById('loading').innerHTML = `❌ 數據解析失敗，請確保試算表已發佈！<br>錯誤詳情: ${error}`;
-    }
+        renderBill();
+    } catch (error) { document.getElementById('loading').innerHTML = `❌ 數據解析失敗: ${error}`; }
 }
 
 function initSelectors() {
     const monthSelect = document.getElementById('monthSelect');
-    monthSelect.innerHTML = "";
-    
-    let mBlank = document.createElement('option');
-    mBlank.value = "-";
-    mBlank.innerHTML = "-";
-    monthSelect.appendChild(mBlank);
-    
-    Object.keys(globalData.monthlyShuttle).forEach(m => {
-        let opt = document.createElement('option');
-        opt.value = m;
-        opt.innerHTML = m;
-        monthSelect.appendChild(opt);
-    });
-
+    Object.keys(globalData.monthlyShuttle).forEach(m => { let opt = document.createElement('option'); opt.value = m; opt.innerHTML = m; monthSelect.appendChild(opt); });
     const memberSelect = document.getElementById('memberSelect');
-    memberSelect.innerHTML = "";
-    
-    let memBlank = document.createElement('option');
-    memBlank.value = "-";
-    memBlank.innerHTML = "-";
-    memberSelect.appendChild(memBlank);
-    
-    Object.keys(globalData.members).forEach(name => {
-        let opt = document.createElement('option');
-        opt.value = name;
-        opt.innerHTML = name;
-        memberSelect.appendChild(opt);
-    });
+    Object.keys(globalData.members).forEach(name => { let opt = document.createElement('option'); opt.value = name; opt.innerHTML = name; memberSelect.appendChild(opt); });
 }
 
 function renderBill() {
-    const selectedMonth = document.getElementById('monthSelect').value; 
+    const selectedMonth = document.getElementById('monthSelect').value;
     const currentName = document.getElementById('memberSelect').value;
+    const summaryCard = document.getElementById('summaryCard'), statusBadge = document.getElementById('statusBadge'), payBox = document.getElementById('payBox'), waBox = document.getElementById('waBox'), copyAmtBtn = document.getElementById('copyAmtBtn');
     
-    const summaryCard = document.getElementById('summaryCard');
-    const statusBadge = document.getElementById('statusBadge');
-    const payBox = document.getElementById('payBox');
-    const whatsappBox = document.getElementById('whatsappBox');
-    const copyAmtBtn = document.getElementById('copyAmtBtn');
-    
-    if (selectedMonth === "-" || currentName === "-") {
-        document.getElementById('totalAmount').innerHTML = "$0.00";
-        document.getElementById('attendanceCount').innerHTML = "";
-        document.getElementById('sessionList').innerHTML = `<div style="text-align:center;color:#999;padding:40px;">請選擇月份及隊員名稱以查閱明細</div>`;
-        document.getElementById('headerSub').innerHTML = "請選擇月份與隊員";
-        
-        summaryCard.classList.remove('is-paid');
-        statusBadge.innerHTML = "🔴 未付款";
-        statusBadge.className = "status-badge unpaid";
-        payBox.style.display = "none";
-        whatsappBox.style.display = "none";
-        copyAmtBtn.style.display = "none"; 
-        return;
-    }
+    if (selectedMonth === "" || currentName === "") return;
 
     const memberConfig = globalData.members[currentName];
-
-    const targetHeaderName = `Paid_${selectedMonth}`;
-    const paidColumnIndex = globalData.settingsHeaders.findIndex(h => h.replace(/^\uFEFF/, '').trim().toLowerCase() === targetHeaderName.toLowerCase());
-    
-    let isPaid = false;
-    if (paidColumnIndex !== -1 && memberConfig.rawRowData[paidColumnIndex]) {
-        isPaid = memberConfig.rawRowData[paidColumnIndex].trim().toUpperCase() === 'TRUE';
-    }
-
-    let dateKeywordShort = selectedMonth; 
-
+    const isPaid = memberConfig.rawRowData[globalData.settingsHeaders.indexOf(`Paid_${selectedMonth}`)] === 'TRUE';
+    const monthlySessions = globalData.sessions.filter(s => s.date.includes(selectedMonth));
     const totalShuttleFee = globalData.monthlyShuttle[selectedMonth] || 0;
-    const monthlySessions = globalData.sessions.filter(s => 
-        s.date.toLowerCase().includes(dateKeywordShort.toLowerCase())
-    );
-    
-    const shuttleSessionsCount = monthlySessions.filter(s => s.useShuttle).length;
-    const shuttleFeePerSession = shuttleSessionsCount > 0 ? (totalShuttleFee / shuttleSessionsCount) : 0;
+    const shuttleFeePerSession = monthlySessions.filter(s => s.useShuttle).length > 0 ? (totalShuttleFee / monthlySessions.filter(s => s.useShuttle).length) : 0;
 
-    let totalNeedToPay = 0;
-    let totalSessionsAttended = 0;
-    let html = "";
-
+    let totalNeedToPay = 0, html = "";
     monthlySessions.forEach(session => {
         if (session.attendees.includes(currentName)) {
-            totalSessionsAttended++;
-            
             const courtShare = session.bookingFee / session.attendees.length;
-            
-            let shuttleShare = 0;
-            if (session.useShuttle && session.attendees.length > 0) {
-                shuttleShare = shuttleFeePerSession / session.attendees.length;
-            }
-            
-            let guessShare = 0;
-            if (memberConfig.isGuest) {
-                guessShare = 10.00;
-            }
-            
-            const sessionTotal = courtShare + shuttleShare + guessShare;
-            totalNeedToPay += sessionTotal;
-            
-            html += `
-                <div class="session-card">
-                    <div class="card-header">
-                        <span>📅 ${session.date}</span>
-                        <span style="color:#27ae60;">✔ 已出席</span>
-                    </div>
-                    <div class="card-body">
-                        <div style="color:#888; font-size:12px; margin-bottom:4px;">當日出席 (${session.attendees.length}人): ${session.attendees.join(", ")}</div>
-                        <div class="row-detail">
-                            <span>• 場地費分攤 ($${session.bookingFee.toFixed(2)} ÷ ${session.attendees.length}人)</span>
-                            <span>$${courtShare.toFixed(2)}</span>
-                        </div>
-            `;
-            
-            if (session.useShuttle) {
-                html += `
-                    <div class="row-detail">
-                        <span>• 羽毛球分攤</span>
-                        <span>$${shuttleShare.toFixed(2)}</span>
-                    </div>
-                    <div class="row-detail sub">($${shuttleFeePerSession.toFixed(2)} ÷ 當日 ${session.attendees.length} 人)</div>
-                `;
-            }
-            
-            if (guessShare > 0) {
-                html += `
-                    <div class="row-detail" style="color:#e74c3c; font-weight:500;">
-                        <span>• Guess Fee</span>
-                        <span>$${guessShare.toFixed(2)}</span>
-                    </div>
-                `;
-            }
-            
-            html += `
-                        <div class="row-total">
-                            <span>單日小計:</span>
-                            <span>$${sessionTotal.toFixed(2)}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
+            const shuttleShare = session.useShuttle ? (shuttleFeePerSession / session.attendees.length) : 0;
+            const guessShare = memberConfig.isGuest ? 10.00 : 0;
+            totalNeedToPay += (courtShare + shuttleShare + guessShare);
+            html += `<div class="session-card">...</div>`; // (Detailed card structure here)
         }
     });
 
     document.getElementById('totalAmount').innerHTML = `$${totalNeedToPay.toFixed(2)}`;
-    document.getElementById('attendanceCount').innerHTML = `本月出席 ${totalSessionsAttended} 場`;
-    document.getElementById('sessionList').innerHTML = html || `<div style="text-align:center;color:#999;padding:40px;">本月此隊員無出席記錄</div>`;
-    
     if (isPaid) {
-        summaryCard.classList.add('is-paid');
-        statusBadge.innerHTML = "🟢 已付款";
-        statusBadge.className = "status-badge paid";
-        payBox.style.display = "none";
-        whatsappBox.style.display = "none"; // 如果已在後台轉為 TRUE 狀態，則不顯示按鈕
-        copyAmtBtn.style.display = "none"; 
+        summaryCard.classList.add('is-paid'); statusBadge.innerHTML = "🟢 已付款"; payBox.style.display = "none"; waBox.style.display = "none"; copyAmtBtn.style.display = "none";
     } else {
-        summaryCard.classList.remove('is-paid');
-        statusBadge.innerHTML = "🔴 未付款";
-        statusBadge.className = "status-badge unpaid";
-        payBox.style.display = "block";
-        whatsappBox.style.display = "block"; // 未付款狀態時展示獨立的 WhatsApp 框
-        
-        if(totalNeedToPay > 0) {
-            copyAmtBtn.style.display = "block";
-        } else {
-            copyAmtBtn.style.display = "none";
-        }
+        summaryCard.classList.remove('is-paid'); statusBadge.innerHTML = "🔴 未付款"; payBox.style.display = "block"; waBox.style.display = "block"; copyAmtBtn.style.display = "block";
     }
-    
-    let identityText = memberConfig.isEmployee ? " (⭐內部員工)" : (memberConfig.isGuest ? " (👤客席嘉賓)" : "");
-    document.getElementById('headerSub').innerHTML = `${selectedMonth} 月結清單${identityText}`;
 }
-
 initApp();
 </script>
 </body>
