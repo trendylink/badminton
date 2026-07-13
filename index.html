@@ -126,8 +126,7 @@
 </div>
 
 <script>
-// 已成功更新為最新的試算表網址
-const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSqcvuELhKEl3yeHBB1zp6DdRC12Ysl7hKCFejj1Pz3tV-qTIaDmbrJGMxS0cZ07jAHnJHyPyMpKFeg/pubhtml';
+const BASE_PUBLISH_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSLj4-wh2m0pKLMpHTPclf3G1WCK354hO0J4yqMWnb9CHU2KhVm4-YHH5nc8qWhtJgGiOTFxKCkxchY/pubhtml';
 
 let globalData = {
     sessions: [],
@@ -176,7 +175,7 @@ async function initApp() {
     try {
         const csvBaseUrl = BASE_PUBLISH_URL.replace('/pubhtml', '/pub?output=csv');
         
-        // 讀取 Settings 分頁 (gid=777656204)
+        // 讀取 Settings 分頁
         const resSettings = await fetch(`${csvBaseUrl}&gid=777656204`);
         const textSettings = await resSettings.text();
         const arrSettings = csvToArray(textSettings);
@@ -221,7 +220,7 @@ async function initApp() {
             }
         });
 
-        // 讀取 Sessions 數據分頁 (gid=0)
+        // 讀取 Sessions 數據分頁
         const resSessions = await fetch(`${csvBaseUrl}&gid=0`);
         const textSessions = await resSessions.text();
         const arrSessions = csvToArray(textSessions);
@@ -236,7 +235,7 @@ async function initApp() {
                 date: row[0].trim(),
                 bookingFee: parseFloat(row[1]) || 0,
                 useShuttle: row[2] ? row[2].trim().toUpperCase() === 'TRUE' : false,
-                guestFee: parseFloat(row[3]) || 0,
+                guessFee: parseFloat(row[3]) || 0,
                 attendees: []
             };
             
@@ -352,12 +351,12 @@ function renderBill() {
                 shuttleShare = shuttleFeePerSession / session.attendees.length;
             }
             
-            let guestShare = 0;
+            let guessShare = 0;
             if (memberConfig.isGuest) {
-                guestShare = 10.00;
+                guessShare = 10.00;
             }
             
-            const sessionTotal = courtShare + shuttleShare + guestShare;
+            const sessionTotal = courtShare + shuttleShare + guessShare;
             totalNeedToPay += sessionTotal;
             
             html += `
@@ -384,11 +383,11 @@ function renderBill() {
                 `;
             }
             
-            if (guestShare > 0) {
+            if (guessShare > 0) {
                 html += `
                     <div class="row-detail" style="color:#e74c3c; font-weight:500;">
-                        <span>• Guest Fee</span>
-                        <span>$${guestShare.toFixed(2)}</span>
+                        <span>• Guess Fee</span>
+                        <span>$${guessShare.toFixed(2)}</span>
                     </div>
                 `;
             }
@@ -413,14 +412,14 @@ function renderBill() {
         statusBadge.innerHTML = "🟢 已付款";
         statusBadge.className = "status-badge paid";
         payBox.style.display = "none";
-        whatsappBox.style.display = "none"; 
+        whatsappBox.style.display = "none"; // 如果已在後台轉為 TRUE 狀態，則不顯示按鈕
         copyAmtBtn.style.display = "none"; 
     } else {
         summaryCard.classList.remove('is-paid');
         statusBadge.innerHTML = "🔴 未付款";
         statusBadge.className = "status-badge unpaid";
         payBox.style.display = "block";
-        whatsappBox.style.display = "block"; 
+        whatsappBox.style.display = "block"; // 未付款狀態時展示獨立的 WhatsApp 框
         
         if(totalNeedToPay > 0) {
             copyAmtBtn.style.display = "block";
