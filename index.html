@@ -415,7 +415,7 @@ function renderBill() {
     document.getElementById('attendanceCount').innerHTML = `本月出席 ${totalSessionsAttended} 場`;
     document.getElementById('sessionList').innerHTML = html || `<div style="text-align:center;color:#999;padding:40px;">本月此隊員無出席記錄</div>`;
 
-    let identityText = memberConfig.isEmployee ? " (⭐內部員工)" : (memberConfig.isGuest ? " (👤客串嘉賓)" : "");
+    let identityText = memberConfig.isEmployee ? " (⭐內部員工)" : (memberConfig.isGuest ? " (👤客席嘉賓)" : "");
     document.getElementById('headerSub').innerHTML = `${selectedMonth} 月結清單${identityText}`;
 
     if (isPaid) {
