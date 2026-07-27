@@ -52,7 +52,7 @@
         .row-total { display: flex; justify-content: space-between; font-weight: bold; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #ddd; color: #333; }
 
         /* 付款按鈕 */
-        .pay-box { background: #fdfefe; border: 1px solid #e1e8ed; border-radius: 12px; padding: 16px; margin-top: 20px; text-align: center; font-size: 13px; }
+        .pay-box { background: #fdfefe; border: 1px solid #e1e8ed; padding: 16px; margin-top: 20px; text-align: center; font-size: 13px; }
         .pay-btn { background: #11998e; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 8px; font-size: 14px; cursor: pointer; display: block; text-decoration: none; }
         
         /* 獨立 WhatsApp 區塊 */
@@ -109,8 +109,9 @@
                     轉賬至 FPS (一鍵複製號碼)
                 </button>
                 
+                <!-- 🌟 已更新 PayMe 按鈕與提示文字 -->
                 <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="payWithPayMe()">
-                    使用 PayMe 付款 (自動複製金額)
+                    使用 PayMe 付款 (需自行輸入金額)
                 </button>
                 
                 <button class="pay-btn" style="background: #00a4e4; margin: 0;" onclick="payWithAlipay()">
@@ -166,18 +167,13 @@ function copyCurrentAmount() {
     }
 }
 
-// 🌟 修正後的 PayMe 複製金額並跳轉
+// 🌟 修正後的 PayMe 提示訊息（提醒需自行手動輸入金額）
 function payWithPayMe() {
     const amt = document.getElementById('totalAmount').innerText.replace('$', '').trim();
-    if (!amt || amt === "0.00") return;
-    navigator.clipboard.writeText(amt);
-    alert(`📋 已為你自動複製應付金額：$${amt} ！\n即將開啟 PayMe，進入後直接貼上金額即可。`);
-    setTimeout(() => {
-        window.location.href = 'https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3';
-    }, 150);
+    alert(`💡 提示：本月應付金額為 $${amt}\n\n因 PayMe 不支援直接貼上，請記低金額並於 PayMe 內自行手動輸入。點擊確定後將前往 PayMe。`);
+    window.location.href = 'https://payme.hsbc/5e115e6f63ec45a6b5e843a7fc08b3d3';
 }
 
-// 🌟 修正後的 Alipay 複製金額並跳轉
 function payWithAlipay() {
     const amt = document.getElementById('totalAmount').innerText.replace('$', '').trim();
     if (!amt || amt === "0.00") return;
