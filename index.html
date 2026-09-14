@@ -109,7 +109,6 @@
                     轉賬至 FPS (一鍵複製號碼)
                 </button>
                 
-                <!-- 🌟 已更新 PayMe 按鈕與提示文字 -->
                 <button class="pay-btn" style="background: #e71d36; margin: 0;" onclick="payWithPayMe()">
                     使用 PayMe 付款 (需自行輸入金額)
                 </button>
@@ -167,7 +166,6 @@ function copyCurrentAmount() {
     }
 }
 
-// 🌟 修正後的 PayMe 提示訊息（提醒需自行手動輸入金額）
 function payWithPayMe() {
     const amt = document.getElementById('totalAmount').innerText.replace('$', '').trim();
     alert(`💡 提示：本月應付金額為 $${amt}\n\n因 PayMe 不支援直接貼上，請記低金額並於 PayMe 內自行手動輸入。點擊確定後將前往 PayMe。`);
@@ -202,17 +200,23 @@ async function initApp() {
         const arrSettings = csvToArray(textSettings);
         
         globalData.settingsHeaders = arrSettings[0].map(h => h ? h.trim() : "");
-        
+        const headers = globalData.settingsHeaders.map(h => h.toLowerCase());
+        const monthIdx = headers.findIndex(h => h.includes("month"));
+        const feeIdx = headers.findIndex(h => h.includes("fee") || h.includes("shuttlecock"));
+        const nameIdx = headers.findIndex(h => h === "name" || h.includes("name"));
+        const empIdx = headers.findIndex(h => h.includes("employee"));
+        const guestIdx = headers.findIndex(h => h.includes("guess") || h.includes("guest"));
+
         let lastSeenMonth = ""; 
         
         arrSettings.forEach((row, index) => {
             if (index === 0) return; 
             
-            let mCol = row[0] ? row[0].trim() : "";
-            let feeCol = row[1] ? row[1].trim() : "";
-            let nameCol = row[3] ? row[3].trim() : "";
-            let empCol = row[4] ? row[4].trim().toUpperCase() : "";
-            let gstCol = row[5] ? row[5].trim().toUpperCase() : "";
+            let mCol = monthIdx !== -1 && row[monthIdx] ? row[monthIdx].trim() : (row[0] ? row[0].trim() : "");
+            let feeCol = feeIdx !== -1 && row[feeIdx] ? row[feeIdx].trim() : (row[1] ? row[1].trim() : "");
+            let nameCol = nameIdx !== -1 && row[nameIdx] ? row[nameIdx].trim() : (row[3] ? row[3].trim() : "");
+            let empCol = empIdx !== -1 && row[empIdx] ? row[empIdx].trim().toUpperCase() : (row[4] ? row[4].trim().toUpperCase() : "");
+            let gstCol = guestIdx !== -1 && row[guestIdx] ? row[guestIdx].trim().toUpperCase() : (row[5] ? row[5].trim().toUpperCase() : "");
             
             if (mCol !== "" && !mCol.includes("function") && !mCol.includes("Object")) {
                 lastSeenMonth = mCol;
@@ -232,7 +236,7 @@ async function initApp() {
         const textSessions = await resSessions.text();
         const arrSessions = csvToArray(textSessions);
         
-        const headers = arrSessions[0].map(h => h ? h.trim() : "");
+        const sessionHeaders = arrSessions[0].map(h => h ? h.trim() : "");
         
         for(let i=1; i<arrSessions.length; i++) {
             const row = arrSessions[i];
@@ -243,12 +247,13 @@ async function initApp() {
                 bookingFee: parseFloat(row[1]) || 0,
                 useShuttle: row[2] ? row[2].trim().toUpperCase() === 'TRUE' : false,
                 guessFee: parseFloat(row[3]) || 0,
-                attendees: []
+                attendees: {}
             };
             
-            for(let j=4; j<headers.length; j++) {
-                if(row[j] && row[j].trim() === '1' && headers[j] && !headers[j].includes("function")) {
-                    session.attendees.push(headers[j]);
+            for(let j=4; j<sessionHeaders.length; j++) {
+                let val = row[j] ? parseFloat(row[j].trim()) : 0;
+                if(val > 0 && sessionHeaders[j] && !sessionHeaders[j].includes("function")) {
+                    session.attendees[sessionHeaders[j]] = val;
                 }
             }
             globalData.sessions.push(session);
@@ -354,34 +359,38 @@ function renderBill() {
     let html = "";
 
     monthlySessions.forEach(session => {
-        if (session.attendees.includes(currentName)) {
+        if (session.attendees.hasOwnProperty(currentName)) {
             totalSessionsAttended++;
             
-            const courtShare = session.bookingFee / session.attendees.length;
-            
-            let shuttleShare = 0;
-            if (session.useShuttle && session.attendees.length > 0) {
-                shuttleShare = shuttleFeePerSession / session.attendees.length;
-            }
-            
-            let guessShare = 0;
-            if (memberConfig.isGuest) {
-                guessShare = 10.00;
-            }
+            const peopleCount = session.attendees[currentName];
+            let dailyTotalPeople = 0;
+            Object.values(session.attendees).forEach(c => { dailyTotalPeople += c; });
+
+            const courtSharePerPerson = session.bookingFee / (dailyTotalPeople > 0 ? dailyTotalPeople : 1);
+            const shuttleSharePerPerson = (session.useShuttle && dailyTotalPeople > 0) ? (shuttleFeePerSession / dailyTotalPeople) : 0;
+
+            const courtShare = courtSharePerPerson * peopleCount;
+            const shuttleShare = shuttleSharePerPerson * peopleCount;
+            const guessShare = memberConfig.isGuest ? (10.00 * peopleCount) : 0;
             
             const sessionTotal = courtShare + shuttleShare + guessShare;
             totalNeedToPay += sessionTotal;
             
+            let attendeeSummary = [];
+            Object.entries(session.attendees).forEach(([name, cnt]) => {
+                attendeeSummary.push(cnt > 1 ? `${name} (${cnt}人)` : name);
+            });
+
             html += `
                 <div class="session-card">
                     <div class="card-header">
                         <span>📅 ${session.date}</span>
-                        <span style="color:#27ae60;">✔ 已出席</span>
+                        <span style="color:#27ae60;">✔ 已出席 (${peopleCount}人)</span>
                     </div>
                     <div class="card-body">
-                        <div style="color:#888; font-size:12px; margin-bottom:4px;">當日出席 (${session.attendees.length}人): ${session.attendees.join(", ")}</div>
+                        <div style="color:#888; font-size:12px; margin-bottom:4px;">當日出席: ${attendeeSummary.join(", ")}</div>
                         <div class="row-detail">
-                            <span>• 場地費分攤 ($${session.bookingFee.toFixed(2)} ÷ ${session.attendees.length}人)</span>
+                            <span>• 場地費分攤 ($${session.bookingFee.toFixed(2)} ÷ 總共 ${dailyTotalPeople} 人 × ${peopleCount}人)</span>
                             <span>$${courtShare.toFixed(2)}</span>
                         </div>
             `;
@@ -389,17 +398,16 @@ function renderBill() {
             if (session.useShuttle) {
                 html += `
                     <div class="row-detail">
-                        <span>• 羽毛球分攤</span>
+                        <span>• 羽毛球分攤 (${peopleCount}人)</span>
                         <span>$${shuttleShare.toFixed(2)}</span>
                     </div>
-                    <div class="row-detail sub">($${shuttleFeePerSession.toFixed(2)} ÷ 當日 ${session.attendees.length} 人)</div>
                 `;
             }
             
             if (guessShare > 0) {
                 html += `
                     <div class="row-detail" style="color:#e74c3c; font-weight:500;">
-                        <span>• Guess Fee</span>
+                        <span>• 嘉賓入場費 (${peopleCount}人 × $10)</span>
                         <span>$${guessShare.toFixed(2)}</span>
                     </div>
                 `;
